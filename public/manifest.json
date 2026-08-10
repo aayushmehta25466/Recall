@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Bookmark Search Engine",
+  "version": "1.0.0",
+  "description": "Semantic search engine and automatic categorizer for your bookmarks.",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "extension/popup/popup.html"
+  },
+  "options_page": "extension/options/options.html",
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}

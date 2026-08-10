@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookmark Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../popup/popup.css">
+</head>
+<body class="m-0 flex h-screen overflow-hidden bg-surface-base text-text-base font-primary">
+  <!-- Sidebar -->
+  <nav class="w-[220px] min-w-[220px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-3 p-space-3 overflow-y-auto text-text-base" aria-label="Main navigation">
+    <div class="px-space-2 mb-space-2">
+      <h1 class="text-md font-extrabold tracking-tight text-text-base flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
+        Bookmark Engine
+      </h1>
+      <p class="text-xs text-text-secondary mt-space-1 ml-4">Semantic search &amp; organizer</p>
+    </div>
+
+    <div>
+      <div class="px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary">Main</div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar bg-surface-raised border-accent-green shadow-clay-sidebar" data-tab="home" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+        <span>Bookmarks</span>
+      </div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="trash" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        <span>Trash</span>
+        <span id="trashCount" class="ml-auto bg-text-base text-text-on-dark text-xs px-space-2 py-space-1 rounded-xs border-2 border-border-strong font-bold hidden">0</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary">Manage</div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="settings" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>Settings</span>
+      </div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="data" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span>Data</span>
+      </div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="rules" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span>Rules</span>
+      </div>
+      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="review" role="tab">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span>Review</span>
+        <span id="uncatCount" class="ml-auto bg-text-base text-text-on-dark text-xs px-space-2 py-space-1 rounded-xs border-2 border-border-strong font-bold hidden">0</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-y-auto h-screen">
+    <!-- Home Panel -->
+    <div id="homePanel" class="max-w-5xl mx-auto px-6 py-5">
+      <!-- Hero -->
+      <div class="mb-5">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-1">
+              <div class="w-2 h-10 bg-accent-green rounded-full flex-shrink-0 shadow-clay-btn"></div>
+              <h1 class="text-lg font-extrabold tracking-tight text-text-base leading-tight">Bookmark Engine</h1>
+            </div>
+            <p class="text-sm text-text-muted ml-5">Smart search and auto-categorization for Chrome</p>
+          </div>
+          <div class="flex gap-2 flex-shrink-0">
+            <button id="refreshIndexBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Refresh Index</button>
+            <button id="organizeAllBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-green rounded-sm bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Organize All</button>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mb-4">
+        <input type="text" id="searchInput" placeholder="Search bookmarks..."
+          class="flex-1 min-w-0 bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-space-4 py-space-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]" autocomplete="off">
+        <select id="sortSelect" class="flex-shrink-0 w-[130px] bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-3 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+          <option value="manual">Manual</option>
+          <option value="date_desc">Newest</option>
+          <option value="date_asc">Oldest</option>
+          <option value="title_asc">Title A-Z</option>
+          <option value="title_desc">Title Z-A</option>
+          <option value="category">By Category</option>
+        </select>
+        <button id="editModeBtn" class="flex-shrink-0 font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-4 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Edit</button>
+        <button id="viewToggleBtn" class="flex-shrink-0 font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-4 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm" title="Toggle folder view">Folders</button>
+      </div>
+
+      <div id="statsBar" class="flex items-center justify-between mb-3 text-sm text-text-secondary">
+        <span id="bookmarksCount">Loading...</span>
+        <span id="filterInfo" class="hidden"></span>
+      </div>
+
+      <!-- Bulk Action Bar (shows when items selected) -->
+      <div id="bulkBar" class="hidden bg-surface-muted border-2 border-border-default rounded-md text-text-base shadow-clay mb-4 px-4 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <span id="selectedCount" class="text-sm font-semibold text-text-base">0 selected</span>
+            <button id="selectAllBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Select All</button>
+            <button id="deselectAllBtn" class="text-xs font-semibold text-text-secondary hover:text-text-base min-h-[36px] px-space-2 cursor-pointer">Deselect</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="bulkCategory" class="bg-surface-inset border-2 border-border-default rounded-sm text-xs text-text-base px-space-3 py-space-1 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[36px] cursor-pointer">
+              <option value="">Move to Category...</option>
+            </select>
+            <button id="bulkMoveBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Move</button>
+            <button id="bulkTagBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Tags</button>
+            <button id="bulkExportBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Export</button>
+            <button id="bulkDeleteBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-accent-red rounded-sm bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="bookmarksList" class="flex flex-col gap-3"></div>
+      <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-text-secondary">
+        <svg class="w-10 h-10 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+        </svg>
+        <p class="text-base">No bookmarks indexed yet.</p>
+        <p class="text-sm mt-1">Run "Organize All" from Settings to get started.</p>
+      </div>
+    </div>
+
+    <!-- Trash Panel -->
+    <div id="trashPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Trashed Bookmarks</h2>
+        <div class="flex gap-2 items-center">
+          <span id="trashInfo" class="text-sm text-text-secondary"></span>
+          <button id="emptyTrashBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-red rounded-sm bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Empty Trash</button>
+        </div>
+      </div>
+      <div id="trashList" class="flex flex-col gap-3"></div>
+      <div id="trashEmpty" class="hidden text-center py-16 text-text-secondary text-sm">Trash is empty.</div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="hidden max-w-5xl mx-auto px-6 py-5 flex flex-col gap-4">
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Appearance</h2>
+        <div class="mt-space-3">
+          <label class="block text-sm text-text-base mb-1 font-semibold">Theme</label>
+          <select id="themeSelect" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+            <option value="auto">Auto (system)</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Auto-Organize</h2>
+        <label class="flex items-center gap-3 cursor-pointer mt-space-3">
+          <input type="checkbox" id="autoOrganizeToggle" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
+          <span class="text-sm text-text-base font-semibold">Enable auto-organize</span>
+        </label>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base border-t-[3px] border-t-accent-blue">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Bulk Organize</h2>
+        <div class="flex items-center gap-3 mb-3 mt-space-3">
+          <button id="runSyncBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">Organize All</button>
+        </div>
+        <div id="syncProgress" class="hidden">
+          <div class="flex justify-between text-sm mb-1">
+            <span id="syncStatus" class="text-text-base">Processing...</span>
+            <span id="syncPercent" class="text-text-base font-mono">0%</span>
+          </div>
+          <div class="w-full bg-surface-inset rounded-xs h-3 border-2 border-border-default shadow-clay-inset">
+            <div id="syncBar" class="bg-accent-green h-full rounded-xs transition-all duration-normal" style="width: 0%"></div>
+          </div>
+          <p id="syncUrl" class="text-xs text-text-secondary mt-1 truncate"></p>
+        </div>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Default Sort</h2>
+        <select id="defaultSort" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer mt-space-3">
+          <option value="manual">Manual (drag to reorder)</option>
+          <option value="date_desc">Newest first</option>
+          <option value="date_asc">Oldest first</option>
+          <option value="title_asc">Title A-Z</option>
+          <option value="title_desc">Title Z-A</option>
+          <option value="category">By Category</option>
+        </select>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base border-t-[3px] border-t-accent-red">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Duplicate Policy</h2>
+        <select id="duplicatePolicy" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer mt-space-3">
+          <option value="keep_oldest">Keep Oldest, Skip Newest</option>
+          <option value="overwrite">Silently Overwrite</option>
+        </select>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">AI Classification</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Use AI to classify bookmarks that can't be categorized by local rules.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm text-text-base mb-1 font-semibold">OpenRouter API Key</label>
+            <input type="password" id="openrouterApiKey" placeholder="sk-or-..." class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px]">
+          </div>
+          <div>
+            <label class="block text-sm text-text-base mb-1 font-semibold">Model</label>
+            <select id="openrouterModel" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+              <option value="openrouter/free">Free Router (auto-select)</option>
+              <option value="meta-llama/llama-3.2-3b-instruct:free">Llama 3.2 3B (free)</option>
+              <option value="google/gemma-2-9b-it:free">Gemma 2 9B (free)</option>
+              <option value="deepseek/deepseek-r1:free">DeepSeek R1 (free)</option>
+            </select>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="semanticSearch" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
+            <span class="text-sm text-text-base font-semibold">Enable AI-powered semantic search</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="aiTagSuggest" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
+            <span class="text-sm text-text-base font-semibold">Auto-suggest tags after sync</span>
+          </label>
+          <div id="aiStatus" class="text-sm text-text-secondary"></div>
+        </div>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Trash</h2>
+        <div class="space-y-3 mt-space-3">
+          <div>
+            <label class="block text-sm text-text-base mb-1 font-semibold">Auto-purge after</label>
+            <select id="trashAutoPurge" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="0">Never</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-text-base mb-1 font-semibold">Max trash size</label>
+            <input type="number" id="trashMaxSize" min="100" max="5000" step="100" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px]">
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-surface-card border-2 border-accent-red rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-accent-red">Danger Zone</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Clear all bookmarks from the local database.</p>
+        <div class="flex items-center gap-3">
+          <button id="clearDbBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-red rounded-sm bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">Clear Database</button>
+          <span id="clearStatus" class="text-sm text-accent-green hidden">Database cleared.</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- Data Panel -->
+    <div id="dataPanel" class="hidden max-w-5xl mx-auto px-6 py-5 flex flex-col gap-4">
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Export</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Export your indexed bookmarks. Choose a format:</p>
+        <div class="flex gap-2">
+          <button id="exportJson" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">JSON</button>
+          <button id="exportCsv" class="font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">CSV</button>
+          <button id="exportHtml" class="font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Chrome HTML</button>
+        </div>
+        <p id="exportStatus" class="text-sm text-accent-green mt-2 hidden"></p>
+      </section>
+
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Import</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Import bookmarks from a file. Supports JSON, CSV, and Chrome HTML format.</p>
+        <input type="file" id="importFile" accept=".json,.csv,.html" class="hidden">
+        <div class="flex items-center gap-3">
+          <button id="importBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Choose File</button>
+          <span id="importFileName" class="text-sm text-text-secondary"></span>
+        </div>
+        <div id="importPreview" class="hidden mt-3 p-3 bg-surface-inset text-text-base border-2 border-border-default rounded-sm shadow-clay-inset">
+          <p class="text-sm" id="importPreviewText"></p>
+          <button id="importConfirmBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm mt-2">Confirm Import</button>
+        </div>
+        <div id="importProgress" class="hidden mt-3">
+          <div class="w-full bg-surface-inset rounded-xs h-3 border-2 border-border-default shadow-clay-inset">
+            <div id="importBar" class="bg-accent-green h-full rounded-xs transition-all" style="width: 0%"></div>
+          </div>
+          <p id="importStatus" class="text-sm text-text-secondary mt-1"></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Rules Panel -->
+    <div id="rulesPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Custom Domain Mappings</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Override automatic classification for specific domains. These are checked before built-in rules.</p>
+        <div id="rulesList" class="flex flex-col gap-2 mb-3"></div>
+        <div class="flex gap-2">
+          <input type="text" id="ruleDomain" placeholder="domain.com" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] flex-1">
+          <select id="ruleCategory" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer"></select>
+          <input type="text" id="ruleSubcategory" placeholder="Subcategory" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] w-32">
+          <button id="addRuleBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Add</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Review Panel (Uncategorized) -->
+    <div id="reviewPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-md font-extrabold tracking-tight text-text-base">Uncategorized Bookmarks</h2>
+            <p class="text-sm text-text-muted mt-1">These bookmarks couldn't be categorized by local rules. Use AI to classify them in bulk.</p>
+          </div>
+          <button id="batchCategorizeBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-blue rounded-sm bg-surface-blue text-accent-blue shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm shrink-0">Categorize with AI</button>
+        </div>
+        <div id="batchProgress" class="hidden mb-3">
+          <div class="flex justify-between text-sm mb-1">
+            <span id="batchStatus" class="text-text-base">Processing...</span>
+            <span id="batchPercent" class="text-text-base font-mono">0%</span>
+          </div>
+          <div class="w-full bg-surface-inset rounded-xs h-3 border-2 border-border-default shadow-clay-inset">
+            <div id="batchBar" class="bg-accent-blue h-full rounded-xs transition-all duration-normal" style="width: 0%"></div>
+          </div>
+        </div>
+        <div id="reviewStats" class="text-sm text-text-secondary mb-3"></div>
+        <div id="reviewList" class="flex flex-col gap-3"></div>
+        <div id="reviewEmpty" class="hidden text-center py-12 text-text-secondary text-sm">
+          All bookmarks categorized! Nothing to review.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./options.js"></script>
+</body>
+</html>

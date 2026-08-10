@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   CLAYMORPHISM DESIGN TOKENS (Tailwind v4 @theme)
+   Warm, tactile, soft-clay educational interface
+   ═══════════════════════════════════════════════════════════════ */
+@theme {
+  /* ── Surface Colors ── */
+  --color-surface-base: #F5F0E8;
+  --color-surface-muted: #FAF7F2;
+  --color-surface-card: #FFFFFF;
+  --color-surface-raised: #E8F5E9;
+  --color-surface-strong: #D4EDDA;
+  --color-surface-blue: #E3F2FD;
+  --color-surface-orange: #FFF3E0;
+  --color-surface-pink: #FCE4EC;
+  --color-surface-inset: #EDE8DF;
+
+  /* ── Text Colors ── */
+  --color-text-base: #2D2A26;
+  --color-text-muted: #6B6560;
+  --color-text-secondary: #8A8580;
+  --color-text-on-dark: #FAF7F2;
+
+  /* ── Accent Colors ── */
+  --color-accent-green: #4CAF50;
+  --color-accent-blue: #5C9CE6;
+  --color-accent-orange: #F4A261;
+  --color-accent-red: #E76F51;
+  --color-accent-pink: #D4759E;
+
+  /* ── Border Colors ── */
+  --color-border-default: #D5CEC5;
+  --color-border-muted: #C5BEB5;
+  --color-border-strong: #3D3832;
+
+  /* ── Fonts ── */
+  --font-primary: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-stack: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Font Sizes ── */
+  --text-xs: 13px;
+  --text-xs--line-height: 18px;
+  --text-sm: 15px;
+  --text-sm--line-height: 22px;
+  --text-md: 17px;
+  --text-md--line-height: 26px;
+  --text-lg: 32px;
+  --text-lg--line-height: 40px;
+  --text-xl: 48px;
+  --text-xl--line-height: 56px;
+
+  /* ── Spacing ── */
+  --spacing-space-1: 4px;
+  --spacing-space-2: 6px;
+  --spacing-space-3: 10px;
+  --spacing-space-4: 14px;
+  --spacing-space-5: 18px;
+  --spacing-space-6: 24px;
+  --spacing-space-7: 32px;
+  --spacing-space-8: 48px;
+
+  /* ── Border Radius (chunky clay) ── */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  /* ── Clay Shadows ── */
+  /* Card: soft offset + inner highlight for clay depth */
+  --shadow-clay: 4px 4px 0px #C5BEB5, inset 0 2px 0px rgba(255,255,255,0.7);
+  /* Card hover: deeper offset */
+  --shadow-clay-lg: 6px 6px 0px #B5AEA5, inset 0 2px 0px rgba(255,255,255,0.8);
+  /* Button: personality offset shadow */
+  --shadow-clay-btn: 3px 3px 0px #C5BEB5;
+  /* Button hover: lift */
+  --shadow-clay-btn-hover: 4px 4px 0px #B5AEA5;
+  /* Pressed: inset effect */
+  --shadow-clay-pressed: inset 2px 2px 4px rgba(0,0,0,0.12), inset -1px -1px 2px rgba(255,255,255,0.5);
+  /* Sidebar item */
+  --shadow-clay-sidebar: 2px 2px 0px #D5CEC5, inset 0 1px 0px rgba(255,255,255,0.5);
+  /* Input: recessed clay */
+  --shadow-clay-inset: inset 2px 2px 4px rgba(0,0,0,0.08), inset -1px -1px 2px rgba(255,255,255,0.4);
+
+  /* ── Durations ── */
+  --transition-duration-instant: 120ms;
+  --transition-duration-fast: 180ms;
+  --transition-duration-normal: 280ms;
+}
