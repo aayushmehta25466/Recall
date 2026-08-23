@@ -2,7 +2,7 @@ const DEFAULT_SETTINGS = {
   autoOrganize: true,
   duplicatePolicy: 'keep_oldest', // 'keep_oldest' | 'overwrite'
   openrouterApiKey: '',
-  openrouterModel: 'openrouter/free',
+  openrouterModel: 'google/gemini-2.5-flash-lite',
   // Theme
   theme: 'auto', // 'auto' | 'dark' | 'light'
   // Trash

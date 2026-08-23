@@ -4,7 +4,7 @@ import { getDomainMapping } from '../taxonomy/domainMappings.js';
 import { getScoreForKeywords } from '../taxonomy/keywordRules.js';
 import { classifyWithAI } from '../ai-classifier/classifier.js';
 import { createBookmark } from '../../shared/types/bookmark.js';
-import { saveBookmark } from '../../database/indexeddb/db.js';
+import { saveBookmark, getBookmark } from '../../database/indexeddb/db.js';
 import { moveBookmarkToCategory, cleanupEmptyFolders } from '../folder-manager/manager.js';
 import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
@@ -163,10 +163,24 @@ export async function runBulkSync(moveInChrome = true) {
     }
 
     try {
+      // Preserve existing categories — never wipe AI/user-categorized bookmarks.
+      // Uncategorized (or missing) records get re-classified on every sync.
+      const existing = await getBookmark(node.url);
+      const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
+
+      let category, subcategory;
+      if (hasRealCategory) {
+        category = existing.category;
+        subcategory = existing.subcategory || '';
+      } else {
+        const html = await fetchHtml(node.url);
+        const metadata = extractMetadata(html, node.url);
+        ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
+      }
+
       const html = await fetchHtml(node.url);
       const metadata = extractMetadata(html, node.url);
       const contentType = inferContentType(metadata, node.url);
-      const { category, subcategory } = classifyFast(metadata, node.url, settings);
 
       const bookmarkObj = createBookmark({
         url: node.url,

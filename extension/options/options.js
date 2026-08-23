@@ -478,7 +478,6 @@ async function updateTrashCount() {
 const autoOrganizeToggle = document.getElementById('autoOrganizeToggle');
 const duplicatePolicy = document.getElementById('duplicatePolicy');
 const defaultSort = document.getElementById('defaultSort');
-const themeSelect = document.getElementById('themeSelect');
 const openrouterApiKey = document.getElementById('openrouterApiKey');
 const openrouterModel = document.getElementById('openrouterModel');
 const semanticSearch = document.getElementById('semanticSearch');
@@ -502,18 +501,21 @@ async function initSettings() {
   defaultSort.value = s.defaultSort || 'manual';
   sortSelect.value = s.defaultSort || 'manual';
   openrouterApiKey.value = s.openrouterApiKey || '';
-  openrouterModel.value = s.openrouterModel || 'openrouter/free';
+  // Migrate legacy model ids (e.g. 'openrouter/free') to the new list
+  const savedModel = s.openrouterModel || 'google/gemini-2.5-flash-lite';
+  openrouterModel.value = [...openrouterModel.options].some(o => o.value === savedModel)
+    ? savedModel
+    : 'google/gemini-2.5-flash-lite';
   semanticSearch.checked = s.semanticSearch || false;
   aiTagSuggest.checked = s.aiTagSuggest !== false;
   trashAutoPurge.value = s.trashAutoPurgeDays ?? 30;
   trashMaxSize.value = s.trashMaxSize || 500;
-  themeSelect.value = s.theme || 'auto';
   updateAiStatus(s);
 }
 
 function updateAiStatus(s) {
   if (s.openrouterApiKey) {
-    aiStatus.textContent = 'AI enabled — ' + (s.openrouterModel || 'openrouter/free');
+    aiStatus.textContent = 'AI enabled — ' + (s.openrouterModel || 'google/gemini-2.5-flash-lite');
     aiStatus.className = 'text-sm text-accent-green';
   } else {
     aiStatus.textContent = 'AI disabled — add an API key to enable';
@@ -536,13 +538,6 @@ semanticSearch.addEventListener('change', () => saveSetting('semanticSearch', se
 aiTagSuggest.addEventListener('change', () => saveSetting('aiTagSuggest', aiTagSuggest.checked));
 trashAutoPurge.addEventListener('change', () => saveSetting('trashAutoPurgeDays', parseInt(trashAutoPurge.value)));
 trashMaxSize.addEventListener('change', () => saveSetting('trashMaxSize', parseInt(trashMaxSize.value)));
-themeSelect.addEventListener('change', () => {
-  saveSetting('theme', themeSelect.value);
-  // Apply theme immediately
-  const isDark = themeSelect.value === 'dark' || (themeSelect.value === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', isDark);
-  document.documentElement.classList.toggle('light', !isDark);
-});
 
 // Sync progress
 chrome.runtime.onMessage.addListener((message) => {
@@ -921,14 +916,19 @@ batchCategorizeBtn.addEventListener('click', async () => {
     batchPercent.textContent = '0%';
     batchStatus.textContent = 'Starting...';
 
-    const { processed, categorized } = await runBatchCategorize(settings, (current, total) => {
+    const { processed, categorized, errors } = await runBatchCategorize(settings, (current, total) => {
       const pct = total > 0 ? Math.round((current / total) * 100) : 0;
       batchBar.style.width = pct + '%';
       batchPercent.textContent = pct + '%';
       batchStatus.textContent = `Processing ${current} of ${total}...`;
     });
 
-    batchStatus.textContent = `Done! Categorized ${categorized} of ${processed} bookmarks.`;
+    if (errors && errors.length > 0) {
+      batchStatus.textContent = `Failed: ${categorized}/${processed} categorized. First error: ${errors[0]}`;
+      console.error('Batch categorize errors:', errors);
+    } else {
+      batchStatus.textContent = `Done! Categorized ${categorized} of ${processed} bookmarks.`;
+    }
 
     setTimeout(() => {
       batchProgress.classList.add('hidden');
