@@ -35,20 +35,27 @@ jobs:
             fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2));
           "
 
-      - name: Zip extension
-        run: cd dist && zip -r ../bookmarkly-${{ steps.version.outputs.VERSION }}.zip . -x ".*"
+      - name: Create source code zip
+        run: zip -r bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip . -x "node_modules/*" "dist/*" ".git/*"
+
+      - name: Create CRX package
+        run: |
+          npm install -g crx3
+          # Generate key if not exists (for first build)
+          if [ ! -f extension-key.pem ]; then
+            openssl genrsa -out extension-key.pem 2048
+          fi
+          crx3 --key extension-key.pem --crx bookmarkly-${{ steps.version.outputs.VERSION }}.crx dist/
 
       - name: Get changelog from commits
         id: changelog
         run: |
-          # Get commits since last tag (or all if first tag)
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s" HEAD)
           else
             COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
           fi
-          # Write to output with multi-line support
           echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
           echo "$COMMITS" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -67,14 +74,21 @@ jobs:
 
             ## Install
 
-            ### Option 1: Download from Releases
-            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}.zip` below
+            ### Option 1: Direct Install (CRX)
+            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}.crx` below
+            2. Open `chrome://extensions/`
+            3. Enable **Developer mode** (top-right toggle)
+            4. Drag and drop the `.crx` file onto the extensions page
+            5. Click **Add extension** when prompted
+
+            ### Option 2: Load Unpacked (Source)
+            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip` below
             2. Unzip the file
             3. Open `chrome://extensions/`
             4. Enable **Developer mode** (top-right toggle)
-            5. Click **Load unpacked** → select the unzipped folder
+            5. Click **Load unpacked** → select the `dist/` folder from the unzipped source
 
-            ### Option 2: Build from Source
+            ### Option 3: Build from Source
             ```bash
             git clone https://github.com/aayushmehta25466/Bookmarkly.git
             cd Bookmarkly
@@ -87,6 +101,8 @@ jobs:
             ---
 
             **Full Changelog**: https://github.com/aayushmehta25466/Bookmarkly/compare/${{ steps.version.outputs.VERSION }}...v${{ steps.version.outputs.VERSION }}
-          files: bookmarkly-${{ steps.version.outputs.VERSION }}.zip
+          files: |
+            bookmarkly-${{ steps.version.outputs.VERSION }}.crx
+            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip
           draft: false
           prerelease: false

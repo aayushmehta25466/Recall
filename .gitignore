@@ -30,3 +30,6 @@ dist-ssr
 .supermemory/
 .commandcode/
 .freebuff/
+
+# Extension signing key
+extension-key.pem
