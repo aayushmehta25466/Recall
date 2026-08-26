@@ -31,5 +31,17 @@ dist-ssr
 .commandcode/
 .freebuff/
 
-# Extension signing key
-extension-key.pem
+# Extension signing keys
+bookmarkly-extension.pem
+bookmarkly-extension.pem.b64
+
+# Generated extension packages
+*.crx
+*.crx3
+
+# Temporary signing key restored by CI
+key.pem
+
+# Build output
+dist/
+release/
