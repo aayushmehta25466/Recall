@@ -13,49 +13,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------------------------------------
-      # 1. Checkout repository
-      # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
-      # 2. Setup Node.js
-      # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      # ---------------------------------------------------------
-      # 3. Install dependencies
-      # ---------------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
-      # ---------------------------------------------------------
-      # 4. Build extension
-      # ---------------------------------------------------------
       - name: Build extension
         run: npm run build
 
-      # ---------------------------------------------------------
-      # 5. Get version from Git tag
-      # ---------------------------------------------------------
       - name: Get version from tag
         id: version
         shell: bash
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
-
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-
           echo "Building Bookmarkly version: $VERSION"
 
-      # ---------------------------------------------------------
-      # 6. Sync manifest version
-      # ---------------------------------------------------------
       - name: Sync manifest version
         run: |
           node <<'NODE'
@@ -85,17 +65,11 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
 
-      # ---------------------------------------------------------
-      # 7. Verify manifest
-      # ---------------------------------------------------------
       - name: Verify manifest
         run: |
           echo "Final manifest:"
           cat dist/manifest.json
 
-      # ---------------------------------------------------------
-      # 8. Create source code ZIP
-      # ---------------------------------------------------------
       - name: Create source code zip
         run: |
           zip -r \
@@ -104,29 +78,26 @@ jobs:
             -x "node_modules/*" \
                "dist/*" \
                ".git/*" \
+               "bookmarkly-extension.pem" \
                "extension-key.pem" \
                "key.pem" \
                "*.crx"
 
       # ---------------------------------------------------------
-      # 9. Check CRX signing secret
+      # Restore permanent signing key
       # ---------------------------------------------------------
       - name: Check CRX signing secret
         env:
           CRX_PRIVATE_KEY_B64: ${{ secrets.CRX_PRIVATE_KEY_B64 }}
         run: |
           if [ -z "$CRX_PRIVATE_KEY_B64" ]; then
-            echo "::error::CRX_PRIVATE_KEY_B64 is NOT available to this workflow."
-            echo "Check GitHub Repository Settings -> Secrets and variables -> Actions."
+            echo "::error::CRX_PRIVATE_KEY_B64 is not available."
             exit 1
           fi
 
           echo "CRX_PRIVATE_KEY_B64 is available."
           echo "Encoded key length: ${#CRX_PRIVATE_KEY_B64}"
 
-      # ---------------------------------------------------------
-      # 10. Restore permanent CRX private key
-      # ---------------------------------------------------------
       - name: Restore CRX private key
         env:
           CRX_PRIVATE_KEY_B64: ${{ secrets.CRX_PRIVATE_KEY_B64 }}
@@ -139,44 +110,34 @@ jobs:
 
           if [ ! -s extension-key.pem ]; then
             echo "::error::Decoded private key is empty."
-            rm -f extension-key.pem
             exit 1
           fi
 
           echo "CRX private key restored successfully."
 
       # ---------------------------------------------------------
-      # 11. Verify local CRX3 installation
-      #
-      # Uses the exact crx3 version from package.json/package-lock.json.
+      # Verify CRX package tool
       # ---------------------------------------------------------
-      - name: Verify CRX3 package tool
+      - name: Verify CRX package tool
         run: |
-          ./node_modules/.bin/crx3 --help
+          ./node_modules/.bin/crx --help
 
       # ---------------------------------------------------------
-      # 12. Create signed CRX
+      # Build CRX
       # ---------------------------------------------------------
       - name: Create CRX package
         run: |
-          ./node_modules/.bin/crx3 dist/ \
-            --key extension-key.pem \
-            --crx "bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
+          ./node_modules/.bin/crx pack \
+            dist/ \
+            -p extension-key.pem \
+            -o "bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
 
-      # ---------------------------------------------------------
-      # 13. Verify CRX package
-      # ---------------------------------------------------------
       - name: Verify CRX package
         run: |
           CRX_FILE="bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
 
-          if [ ! -f "$CRX_FILE" ]; then
-            echo "::error::CRX file was not created."
-            exit 1
-          fi
-
           if [ ! -s "$CRX_FILE" ]; then
-            echo "::error::CRX file is empty."
+            echo "::error::CRX file was not created."
             exit 1
           fi
 
@@ -184,7 +145,7 @@ jobs:
           ls -lh "$CRX_FILE"
 
       # ---------------------------------------------------------
-      # 14. Remove private key
+      # Remove private key
       # ---------------------------------------------------------
       - name: Remove signing key
         if: always()
@@ -193,7 +154,7 @@ jobs:
           echo "Signing key removed from runner."
 
       # ---------------------------------------------------------
-      # 15. Generate changelog
+      # Changelog
       # ---------------------------------------------------------
       - name: Get changelog from commits
         id: changelog
@@ -212,7 +173,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       # ---------------------------------------------------------
-      # 16. Create GitHub Release
+      # GitHub Release
       # ---------------------------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -229,13 +190,13 @@ jobs:
 
             ## Downloads
 
-            ### 📦 Chrome Extension
+            ### Chrome Extension
 
             Download:
 
             `bookmarkly-${{ steps.version.outputs.VERSION }}.crx`
 
-            ### 📁 Source Code
+            ### Source Code
 
             Download:
 
@@ -245,36 +206,22 @@ jobs:
 
             ## Installation
 
-            ### Option 1: CRX
+            ### CRX
 
             1. Download the `.crx` file.
             2. Open `chrome://extensions/`
-            3. Enable **Developer mode**.
+            3. Enable Developer mode.
             4. Drag the `.crx` file onto the Extensions page.
             5. Follow Chrome's installation prompt.
 
-            ### Option 2: Load Unpacked
+            ### Load Unpacked
 
             1. Download the source ZIP.
-            2. Extract the ZIP.
+            2. Extract it.
             3. Open `chrome://extensions/`
-            4. Enable **Developer mode**.
-            5. Click **Load unpacked**.
+            4. Enable Developer mode.
+            5. Click Load unpacked.
             6. Select the `dist` folder.
-
-            ### Option 3: Build From Source
-
-            ```bash
-            git clone https://github.com/aayushmehta25466/Bookmarkly.git
-            cd Bookmarkly
-            git checkout v${{ steps.version.outputs.VERSION }}
-            npm install
-            npm run build
-            ```
-
-            Then load the `dist/` folder from:
-
-            `chrome://extensions/`
 
             ---
 
