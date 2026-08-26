@@ -38,14 +38,13 @@ jobs:
       - name: Create source code zip
         run: zip -r bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip . -x "node_modules/*" "dist/*" ".git/*"
 
+      - name: Generate extension key
+        run: |
+          openssl genrsa -out extension-key.pem 2048 2>/dev/null
+
       - name: Create CRX package
         run: |
-          npm install -g crx3
-          # Generate key if not exists (for first build)
-          if [ ! -f extension-key.pem ]; then
-            openssl genrsa -out extension-key.pem 2048
-          fi
-          crx3 --key extension-key.pem --crx bookmarkly-${{ steps.version.outputs.VERSION }}.crx dist/
+          npx crx pack dist/ -p extension-key.pem -o bookmarkly-${{ steps.version.outputs.VERSION }}.crx
 
       - name: Get changelog from commits
         id: changelog
