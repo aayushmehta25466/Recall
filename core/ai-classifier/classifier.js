@@ -1,20 +1,26 @@
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
+import { validateSubcategory, buildTaxonomyPrompt } from '../taxonomy/categories.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const VALID_CATEGORIES = Object.values(CATEGORIES).filter(c => c !== CATEGORIES.UNCATEGORIZED);
 
+const TAXONOMY_TEXT = buildTaxonomyPrompt();
+
 const SYSTEM_PROMPT = `You are a bookmark classifier. Given a bookmark's URL, title, and description, assign it to the best category and subcategory.
 
-Available categories: ${VALID_CATEGORIES.join(', ')}
+ALLOWED HIERARCHICAL CATEGORY → SUBCATEGORY structure (closed list — nothing else exists):
+${TAXONOMY_TEXT}
 
 Reply with ONLY a JSON object, no other text:
-{"category": "Category", "subcategory": "Subcategory"}
+{"category": "Category", "subcategory": "Group / Leaf"}
 
 Rules:
-- Pick the single best category from the list above
-- Subcategory is a short specific label (e.g. "Frontend", "Videos", "API", "Research Papers")
-- If nothing fits, use "Uncategorized" with empty subcategory
+- "category" MUST be one of: ${VALID_CATEGORIES.join(', ')}
+- "subcategory" MUST be the FULL PATH in format "Group / Leaf" — e.g. "Web / Frontend", "Data & AI / ML", "Content / Tutorials"
+- NEVER invent new groups or leaves — only use what's listed above
+- If no subcategory fits well, use "" (empty string)
+- If nothing fits at all, use "Uncategorized" with empty subcategory
 - Never add explanations, only JSON`;
 
 // In-memory cache for AI classification results (URL → result)
@@ -77,9 +83,11 @@ Keywords: ${(metadata.keywords || []).join(', ')}`;
 
     // Validate against the actual category values
     if (parsed.category && VALID_CATEGORIES.includes(parsed.category)) {
+      const rawSub = typeof parsed.subcategory === 'string' ? parsed.subcategory.trim() : '';
+      const sub = validateSubcategory(parsed.category, rawSub);
       const result = {
         category: parsed.category,
-        subcategory: parsed.subcategory || '',
+        subcategory: sub,
       };
       // Cache the result
       if (aiCache.size >= MAX_CACHE_SIZE) {

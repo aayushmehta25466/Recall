@@ -20,7 +20,8 @@ function getBookmarksBarNode(rootTree) {
 }
 
 /**
- * Creates the folder hierarchy: Bookmarks Bar > Engine Organized > Category > Subcategory
+ * Creates the folder hierarchy: Bookmarks Bar > Engine Organized > Category > [Group >] Leaf
+ * Subcategory paths use " / " separator: "Web / Frontend" → Engine Organized / Development / Web / Frontend
  * Returns the final folder ID.
  */
 export async function getTargetFolderId(category, subcategory) {
@@ -33,10 +34,17 @@ export async function getTargetFolderId(category, subcategory) {
   }
 
   const engineRootId = await getOrCreateFolder(barNode.id, 'Engine Organized');
-  const catFolderId = await getOrCreateFolder(engineRootId, category);
+  let currentId = await getOrCreateFolder(engineRootId, category);
 
-  if (!subcategory) return catFolderId;
-  return getOrCreateFolder(catFolderId, subcategory);
+  if (!subcategory) return currentId;
+
+  // Split "Group / Leaf" into ["Group", "Leaf"] and create nested folders
+  const parts = subcategory.split(' / ').map(s => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    currentId = await getOrCreateFolder(currentId, part);
+  }
+
+  return currentId;
 }
 
 /**

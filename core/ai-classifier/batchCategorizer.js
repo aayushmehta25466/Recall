@@ -1,4 +1,5 @@
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
+import { taxonomyTree, validateSubcategory, buildTaxonomyPrompt } from '../taxonomy/categories.js';
 import { updateBookmark, getActiveBookmarks } from '../../database/indexeddb/db.js';
 import { moveBookmarkToCategory, cleanupEmptyFolders } from '../folder-manager/manager.js';
 
@@ -8,21 +9,29 @@ const VALID_CATEGORIES = Object.values(CATEGORIES).filter(c => c !== CATEGORIES.
 // amortizing request overhead. Drop to 8 if responses get truncated.
 const BATCH_SIZE = 15;
 
+// Build hierarchical taxonomy text for the AI prompt
+const TAXONOMY_TEXT = buildTaxonomyPrompt();
+
 const SYSTEM_PROMPT = `You are a precise bookmark categorization assistant. Your output MUST be a valid JSON object mapping indices to classification results.
+
+ALLOWED HIERARCHICAL CATEGORY → SUBCATEGORY structure (closed list — nothing else exists):
+${TAXONOMY_TEXT}
 
 CRITICAL RULES:
 1. Output ONLY a JSON object: {"0":{"category":"...","subcategory":"...","tags":["..."]},"1":{...}}
 2. NO explanations, NO questions, NO markdown fences, NO additional text
 3. Each input bookmark index maps to exactly one output key
 4. Return EXACTLY {bookmarkCount} entries in the object (keys "0" through "{lastIndex}")
-5. Assign EXACTLY ONE category per bookmark from this list: ${VALID_CATEGORIES.join(', ')}
-6. subcategory = short specific label like "Frontend", "Videos", "Research", "Deals"
-7. tags = array of 2-5 lowercase hyphenated tags derived from title/URL/domain, e.g. ["react-tutorial","hooks","frontend"]
-8. If uncertain about category, pick the closest match — never use "Uncategorized"
-9. If a bookmark has insufficient data, still classify by domain/URL pattern
+5. "category" MUST be one of: ${VALID_CATEGORIES.join(', ')}
+6. "subcategory" MUST be the FULL PATH in format "Group / Leaf" — e.g. "Web / Frontend", "Data & AI / ML", "Content / Tutorials"
+7. NEVER invent new groups or leaves — only use what's listed above
+8. If no subcategory fits well, use "" (empty string) instead of inventing one
+9. tags = array of 2-5 lowercase hyphenated tags derived from title/URL/domain, e.g. ["react-tutorial","hooks","frontend"]
+10. If uncertain about category, pick the closest match — never use "Uncategorized"
+11. If a bookmark has insufficient data, still classify by domain/URL pattern
 
 Output format example for 2 bookmarks:
-{"0":{"category":"Development","subcategory":"Frontend","tags":["react","tutorial","spa"]},"1":{"category":"News & Media","subcategory":"Tech News","tags":["ai","industry","daily"]}}`;
+{"0":{"category":"Development","subcategory":"Web / Frontend","tags":["react","tutorial","spa"]},"1":{"category":"News & Media","subcategory":"Sources / Tech News","tags":["ai","industry","daily"]}}`;
 
 /**
  * Parse AI response with 4 fallback strategies (Metrolist pattern).
@@ -71,7 +80,7 @@ function parseClassificationResponse(raw, expectedCount) {
   return {};
 }
 
-/** Validate + sanitize one AI result entry. Case-insensitive category match. */
+/** Validate + sanitize one AI result entry. Enforces hierarchical taxonomy paths. */
 function sanitizeResult(result) {
   if (!result || typeof result !== 'object') return null;
   if (!result.category) return null;
@@ -80,9 +89,12 @@ function sanitizeResult(result) {
     c => c.toLowerCase() === String(result.category).trim().toLowerCase()
   );
   if (!match) return null;
+  // Validate subcategory path against the hierarchical taxonomy
+  const rawSub = typeof result.subcategory === 'string' ? result.subcategory.trim() : '';
+  const sub = validateSubcategory(match, rawSub);
   return {
     category: match,
-    subcategory: typeof result.subcategory === 'string' ? result.subcategory : '',
+    subcategory: sub,
     tags: Array.isArray(result.tags)
       ? result.tags.filter(t => typeof t === 'string').slice(0, 5)
       : [],

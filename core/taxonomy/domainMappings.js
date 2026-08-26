@@ -1,21 +1,21 @@
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
 
 export const domainMappings = {
-  'github.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Open Source' },
-  'stackoverflow.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Learning' },
-  'developer.mozilla.org': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Documentation' },
-  'youtube.com': { category: CATEGORIES.LEARNING, subcategory: 'Videos' },
-  'figma.com': { category: CATEGORIES.DESIGN, subcategory: 'Tools' },
-  'leetcode.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Interview Prep' },
-  'aws.amazon.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Cloud' },
-  'stripe.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'API' }, // Needs deeper path matching for docs in real impl
-  'medium.com': { category: CATEGORIES.LEARNING, subcategory: 'Blogs' },
-  'news.ycombinator.com': { category: CATEGORIES.NEWS_MEDIA, subcategory: 'Tech News' },
-  'arxiv.org': { category: CATEGORIES.LEARNING, subcategory: 'Research Papers' },
-  'dribbble.com': { category: CATEGORIES.DESIGN, subcategory: 'Inspiration' },
-  'jira.atlassian.com': { category: CATEGORIES.PRODUCTIVITY, subcategory: 'Task Management' },
-  'chromewebstore.google.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Extensions' },
-  'chrome.google.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Extensions' },
+  'github.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Languages & Tools / Open Source' },
+  'stackoverflow.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Languages & Tools / Documentation' },
+  'developer.mozilla.org': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Web / Documentation' },
+  'youtube.com': { category: CATEGORIES.LEARNING, subcategory: 'Content / Videos' },
+  'figma.com': { category: CATEGORIES.DESIGN, subcategory: 'Resources / Tools' },
+  'leetcode.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Languages & Tools / Testing' },
+  'aws.amazon.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'DevOps & Cloud / Cloud' },
+  'stripe.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Web / API' },
+  'medium.com': { category: CATEGORIES.LEARNING, subcategory: 'Content / Blogs' },
+  'news.ycombinator.com': { category: CATEGORIES.NEWS_MEDIA, subcategory: 'Sources / Tech News' },
+  'arxiv.org': { category: CATEGORIES.LEARNING, subcategory: 'References / Research Papers' },
+  'dribbble.com': { category: CATEGORIES.DESIGN, subcategory: 'Resources / Inspiration' },
+  'jira.atlassian.com': { category: CATEGORIES.PRODUCTIVITY, subcategory: 'Tools / Task Management' },
+  'chromewebstore.google.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Languages & Tools / Extensions' },
+  'chrome.google.com': { category: CATEGORIES.DEVELOPMENT, subcategory: 'Languages & Tools / Extensions' },
 };
 
 /**
@@ -24,7 +24,6 @@ export const domainMappings = {
  * @returns {Object|null}
  */
 export function getDomainMapping(domain) {
-  // Simple check for now, can be expanded to check suffixes (e.g. docs.stripe.com)
   if (domainMappings[domain]) {
     return domainMappings[domain];
   }
