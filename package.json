@@ -19,7 +19,7 @@
     "@babel/preset-env": "^8.0.2",
     "@jest/globals": "^30.4.1",
     "babel-jest": "^30.4.1",
-    "crx3": "^2.0.0",
+    "crx": "^5.0.1",
     "jest": "^30.4.2",
     "jsdom": "^29.1.1",
     "vite": "^8.2.0"
