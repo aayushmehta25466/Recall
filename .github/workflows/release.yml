@@ -54,7 +54,7 @@ jobs:
           echo "Building Bookmarkly version: $VERSION"
 
       # ---------------------------------------------------------
-      # 6. Sync manifest version with Git tag
+      # 6. Sync manifest version
       # ---------------------------------------------------------
       - name: Sync manifest version
         run: |
@@ -63,6 +63,11 @@ jobs:
 
           const manifestPath = 'dist/manifest.json';
           const version = process.env.VERSION;
+
+          if (!fs.existsSync(manifestPath)) {
+            console.error(`Manifest not found: ${manifestPath}`);
+            process.exit(1);
+          }
 
           const manifest = JSON.parse(
             fs.readFileSync(manifestPath, 'utf8')
@@ -112,8 +117,7 @@ jobs:
         run: |
           if [ -z "$CRX_PRIVATE_KEY_B64" ]; then
             echo "::error::CRX_PRIVATE_KEY_B64 is NOT available to this workflow."
-            echo "Make sure CRX_PRIVATE_KEY_B64 exists under:"
-            echo "Settings -> Secrets and variables -> Actions -> Repository secrets"
+            echo "Check GitHub Repository Settings -> Secrets and variables -> Actions."
             exit 1
           fi
 
@@ -142,18 +146,20 @@ jobs:
           echo "CRX private key restored successfully."
 
       # ---------------------------------------------------------
-      # 11. Verify CRX3 package tool
+      # 11. Verify local CRX3 installation
+      #
+      # Uses the exact crx3 version from package.json/package-lock.json.
       # ---------------------------------------------------------
       - name: Verify CRX3 package tool
         run: |
-          npx crx3 --help
+          ./node_modules/.bin/crx3 --help
 
       # ---------------------------------------------------------
       # 12. Create signed CRX
       # ---------------------------------------------------------
       - name: Create CRX package
         run: |
-          npx crx3 dist/ \
+          ./node_modules/.bin/crx3 dist/ \
             --key extension-key.pem \
             --crx "bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
 
@@ -178,7 +184,7 @@ jobs:
           ls -lh "$CRX_FILE"
 
       # ---------------------------------------------------------
-      # 14. Remove private key from runner
+      # 14. Remove private key
       # ---------------------------------------------------------
       - name: Remove signing key
         if: always()
