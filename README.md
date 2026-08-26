@@ -116,6 +116,13 @@ The built extension will be in the `dist/` folder.
 4. Select the `dist/` folder from this project
 5. Bookmarkly appears in your toolbar
 
+### Install from Release
+
+1. Go to [Releases](https://github.com/aayushmehta25466/Bookmarkly/releases)
+2. Download the latest `bookmarkly-X.X.X.zip`
+3. Unzip the file
+4. Open `chrome://extensions/` → Enable **Developer mode** → **Load unpacked** → select the unzipped folder
+
 ### Connect an LLM (OpenRouter)
 
 Bookmarkly uses [OpenRouter](https://openrouter.ai/) to access AI models for categorization. You need a free API key:
@@ -192,6 +199,30 @@ tests/              # Jest tests for core modules
 - IndexedDB (via `idb`)
 - Jest (testing)
 - ESM modules throughout
+
+### Releases
+
+This project uses GitHub Actions to automate releases. The workflow:
+
+1. **On every PR** — builds the extension and runs tests
+2. **On tag push** — builds, zips the extension, and creates a GitHub Release
+
+**To create a release:**
+
+```bash
+# Bump version (updates package.json and creates a git tag)
+npm version patch   # 0.0.1 → 0.0.2
+npm version minor   # 0.0.2 → 0.1.0
+npm version major   # 0.1.0 → 1.0.0
+
+# Push the tag to trigger the release workflow
+git push --follow-tags
+```
+
+This automatically:
+- Syncs the version into `manifest.json`
+- Zips the `dist/` folder as `bookmarkly-X.X.X.zip`
+- Creates a GitHub Release with install instructions
 
 ---
 
