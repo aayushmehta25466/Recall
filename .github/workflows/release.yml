@@ -13,29 +13,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ---------------------------------------------------------
+      # 1. Checkout repository
+      # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------------
+      # 2. Setup Node.js
+      # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # ---------------------------------------------------------
+      # 3. Install dependencies
+      # ---------------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
+      # ---------------------------------------------------------
+      # 4. Build extension
+      # ---------------------------------------------------------
       - name: Build extension
         run: npm run build
 
+      # ---------------------------------------------------------
+      # 5. Get version from Git tag
+      # ---------------------------------------------------------
       - name: Get version from tag
         id: version
         shell: bash
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
+
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
           echo "Building Bookmarkly version: $VERSION"
 
+      # ---------------------------------------------------------
+      # 6. Sync manifest version
+      # ---------------------------------------------------------
       - name: Sync manifest version
         run: |
           node <<'NODE'
@@ -65,12 +85,44 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
 
-      - name: Verify manifest
+      # ---------------------------------------------------------
+      # 7. Verify final extension build
+      # ---------------------------------------------------------
+      - name: Verify extension build
         run: |
-          echo "Final manifest:"
+          if [ ! -f "dist/manifest.json" ]; then
+            echo "::error::dist/manifest.json does not exist."
+            exit 1
+          fi
+
+          echo "Final extension contents:"
+          find dist -maxdepth 3 -type f | sort
+
+          echo ""
+          echo "Manifest:"
           cat dist/manifest.json
 
-      - name: Create source code zip
+      # ---------------------------------------------------------
+      # 8. Create final extension ZIP
+      #
+      # IMPORTANT:
+      # This ZIP contains ONLY the built dist/ contents.
+      # ---------------------------------------------------------
+      - name: Create extension ZIP
+        run: |
+          cd dist
+
+          zip -r \
+            "../bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip" \
+            .
+
+      # ---------------------------------------------------------
+      # 9. Create source ZIP
+      #
+      # This contains the actual project source, but excludes
+      # generated build files and dependencies.
+      # ---------------------------------------------------------
+      - name: Create source ZIP
         run: |
           zip -r \
             "bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip" \
@@ -78,83 +130,92 @@ jobs:
             -x "node_modules/*" \
                "dist/*" \
                ".git/*" \
-               "bookmarkly-extension.pem" \
-               "extension-key.pem" \
-               "key.pem" \
-               "*.crx"
+               "*.crx" \
+               "*.zip" \
+               "*.pem" \
+               "*.b64"
 
       # ---------------------------------------------------------
-      # Restore permanent signing key
+      # 10. Verify release artifacts
       # ---------------------------------------------------------
-      - name: Check CRX signing secret
-        env:
-          CRX_PRIVATE_KEY_B64: ${{ secrets.CRX_PRIVATE_KEY_B64 }}
+      - name: Verify release artifacts
         run: |
-          if [ -z "$CRX_PRIVATE_KEY_B64" ]; then
-            echo "::error::CRX_PRIVATE_KEY_B64 is not available."
+          EXTENSION_ZIP="bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip"
+          SOURCE_ZIP="bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip"
+
+          if [ ! -s "$EXTENSION_ZIP" ]; then
+            echo "::error::Extension ZIP was not created."
             exit 1
           fi
 
-          echo "CRX_PRIVATE_KEY_B64 is available."
-          echo "Encoded key length: ${#CRX_PRIVATE_KEY_B64}"
-
-      - name: Restore CRX private key
-        env:
-          CRX_PRIVATE_KEY_B64: ${{ secrets.CRX_PRIVATE_KEY_B64 }}
-        run: |
-          printf '%s' "$CRX_PRIVATE_KEY_B64" \
-            | base64 --decode \
-            > extension-key.pem
-
-          chmod 600 extension-key.pem
-
-          if [ ! -s extension-key.pem ]; then
-            echo "::error::Decoded private key is empty."
+          if [ ! -s "$SOURCE_ZIP" ]; then
+            echo "::error::Source ZIP was not created."
             exit 1
           fi
 
-          echo "CRX private key restored successfully."
+          echo "Release artifacts:"
+          ls -lh "$EXTENSION_ZIP"
+          ls -lh "$SOURCE_ZIP"
 
       # ---------------------------------------------------------
-      # Verify CRX package tool
+      # 11. Create GitHub Release
       # ---------------------------------------------------------
-      - name: Verify CRX package tool
-        run: |
-          ./node_modules/.bin/crx --help
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
+          tag_name: "v${{ steps.version.outputs.VERSION }}"
+
+          body: |
+            ## What's New
+
+            ${{ steps.changelog.outputs.COMMITS }}
+
+            ---
+
+            ## 📦 Downloads
+
+            ### Bookmarkly Extension
+
+            Download:
+
+            `bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip`
+
+            This ZIP contains the final production build of Bookmarkly.
+
+            ### Source Code
+
+            Download:
+
+            `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip`
+
+            This contains the project source code for developers.
+
+            ---
+
+            ## 🚀 Install Bookmarkly
+
+            1. Download the `-extension.zip` file.
+            2. Extract the ZIP file.
+            3. Open Chrome and go to:
+               `chrome://extensions/`
+            4. Enable **Developer mode**.
+            5. Click **Load unpacked**.
+            6. Select the extracted extension folder containing `manifest.json`.
+
+            ---
+
+            **Version:** `${{ steps.version.outputs.VERSION }}`
+
+          files: |
+            bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip
+            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip
+
+          draft: false
+          prerelease: false
 
       # ---------------------------------------------------------
-      # Build CRX
-      # ---------------------------------------------------------
-      - name: Create CRX package
-        run: |
-          ./node_modules/.bin/crx pack \
-            dist/ \
-            -p extension-key.pem \
-            -o "bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
-
-      - name: Verify CRX package
-        run: |
-          CRX_FILE="bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
-
-          if [ ! -s "$CRX_FILE" ]; then
-            echo "::error::CRX file was not created."
-            exit 1
-          fi
-
-          echo "CRX created successfully:"
-          ls -lh "$CRX_FILE"
-
-      # ---------------------------------------------------------
-      # Remove private key
-      # ---------------------------------------------------------
-      - name: Remove signing key
-        if: always()
-        run: |
-          rm -f extension-key.pem
-          echo "Signing key removed from runner."
-
-      # ---------------------------------------------------------
-      # Changelog
+      # 12. Generate changelog
       # ---------------------------------------------------------
       - name: Get changelog from commits
         id: changelog
@@ -171,65 +232,3 @@ jobs:
           echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
           echo "$COMMITS" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
-
-      # ---------------------------------------------------------
-      # GitHub Release
-      # ---------------------------------------------------------
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
-          tag_name: "v${{ steps.version.outputs.VERSION }}"
-
-          body: |
-            ## What's New
-
-            ${{ steps.changelog.outputs.COMMITS }}
-
-            ---
-
-            ## Downloads
-
-            ### Chrome Extension
-
-            Download:
-
-            `bookmarkly-${{ steps.version.outputs.VERSION }}.crx`
-
-            ### Source Code
-
-            Download:
-
-            `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip`
-
-            ---
-
-            ## Installation
-
-            ### CRX
-
-            1. Download the `.crx` file.
-            2. Open `chrome://extensions/`
-            3. Enable Developer mode.
-            4. Drag the `.crx` file onto the Extensions page.
-            5. Follow Chrome's installation prompt.
-
-            ### Load Unpacked
-
-            1. Download the source ZIP.
-            2. Extract it.
-            3. Open `chrome://extensions/`
-            4. Enable Developer mode.
-            5. Click Load unpacked.
-            6. Select the `dist` folder.
-
-            ---
-
-            **Version:** `${{ steps.version.outputs.VERSION }}`
-
-          files: |
-            bookmarkly-${{ steps.version.outputs.VERSION }}.crx
-            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip
-
-          draft: false
-          prerelease: false
