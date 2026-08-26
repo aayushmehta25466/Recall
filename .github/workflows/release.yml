@@ -38,19 +38,55 @@ jobs:
       - name: Zip extension
         run: cd dist && zip -r ../bookmarkly-${{ steps.version.outputs.VERSION }}.zip . -x ".*"
 
+      - name: Get changelog from commits
+        id: changelog
+        run: |
+          # Get commits since last tag (or all if first tag)
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+          fi
+          # Write to output with multi-line support
+          echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ steps.version.outputs.VERSION }}
+          name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
+          tag_name: v${{ steps.version.outputs.VERSION }}
           body: |
-            ## Bookmarkly v${{ steps.version.outputs.VERSION }}
+            ## What's New
 
-            ### Install
-            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}.zip`
+            ${{ steps.changelog.outputs.COMMITS }}
+
+            ---
+
+            ## Install
+
+            ### Option 1: Download from Releases
+            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}.zip` below
             2. Unzip the file
             3. Open `chrome://extensions/`
-            4. Enable **Developer mode**
+            4. Enable **Developer mode** (top-right toggle)
             5. Click **Load unpacked** → select the unzipped folder
+
+            ### Option 2: Build from Source
+            ```bash
+            git clone https://github.com/aayushmehta25466/Bookmarkly.git
+            cd Bookmarkly
+            git checkout v${{ steps.version.outputs.VERSION }}
+            npm install
+            npm run build
+            ```
+            Then load the `dist/` folder in `chrome://extensions/`.
+
+            ---
+
+            **Full Changelog**: https://github.com/aayushmehta25466/Bookmarkly/compare/${{ steps.version.outputs.VERSION }}...v${{ steps.version.outputs.VERSION }}
           files: bookmarkly-${{ steps.version.outputs.VERSION }}.zip
           draft: false
           prerelease: false
