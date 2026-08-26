@@ -45,6 +45,7 @@ jobs:
       # ---------------------------------------------------------
       - name: Get version from tag
         id: version
+        shell: bash
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
 
@@ -53,44 +54,47 @@ jobs:
           echo "Building Bookmarkly version: $VERSION"
 
       # ---------------------------------------------------------
-      # 6. Sync manifest version
+      # 6. Sync manifest version with Git tag
       # ---------------------------------------------------------
       - name: Sync manifest version
         run: |
-          cd dist
+          node <<'NODE'
+          const fs = require('fs');
 
-          node -e "
-            const fs = require('fs');
+          const manifestPath = 'dist/manifest.json';
+          const version = process.env.VERSION;
 
-            const manifestPath = 'manifest.json';
+          const manifest = JSON.parse(
+            fs.readFileSync(manifestPath, 'utf8')
+          );
 
-            const manifest = JSON.parse(
-              fs.readFileSync(manifestPath, 'utf8')
-            );
+          manifest.version = version;
 
-            manifest.version = '${{ steps.version.outputs.VERSION }}';
+          fs.writeFileSync(
+            manifestPath,
+            JSON.stringify(manifest, null, 2) + '\n'
+          );
 
-            fs.writeFileSync(
-              manifestPath,
-              JSON.stringify(manifest, null, 2) + '\n'
-            );
-          "
+          console.log(`Manifest version updated to ${version}`);
+          NODE
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
 
       # ---------------------------------------------------------
       # 7. Verify manifest
       # ---------------------------------------------------------
       - name: Verify manifest
         run: |
-          echo "Final extension manifest:"
+          echo "Final manifest:"
           cat dist/manifest.json
 
       # ---------------------------------------------------------
-      # 8. Create source ZIP
+      # 8. Create source code ZIP
       # ---------------------------------------------------------
       - name: Create source code zip
         run: |
           zip -r \
-            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip \
+            "bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip" \
             . \
             -x "node_modules/*" \
                "dist/*" \
@@ -101,10 +105,6 @@ jobs:
 
       # ---------------------------------------------------------
       # 9. Check CRX signing secret
-      #
-      # IMPORTANT:
-      # This does NOT print the secret.
-      # It only checks whether GitHub made it available.
       # ---------------------------------------------------------
       - name: Check CRX signing secret
         env:
@@ -112,6 +112,8 @@ jobs:
         run: |
           if [ -z "$CRX_PRIVATE_KEY_B64" ]; then
             echo "::error::CRX_PRIVATE_KEY_B64 is NOT available to this workflow."
+            echo "Make sure CRX_PRIVATE_KEY_B64 exists under:"
+            echo "Settings -> Secrets and variables -> Actions -> Repository secrets"
             exit 1
           fi
 
@@ -133,6 +135,7 @@ jobs:
 
           if [ ! -s extension-key.pem ]; then
             echo "::error::Decoded private key is empty."
+            rm -f extension-key.pem
             exit 1
           fi
 
@@ -152,7 +155,7 @@ jobs:
         run: |
           npx crx3 dist/ \
             --key extension-key.pem \
-            --crx bookmarkly-${{ steps.version.outputs.VERSION }}.crx
+            --crx "bookmarkly-${{ steps.version.outputs.VERSION }}.crx"
 
       # ---------------------------------------------------------
       # 13. Verify CRX package
@@ -175,13 +178,12 @@ jobs:
           ls -lh "$CRX_FILE"
 
       # ---------------------------------------------------------
-      # 14. Remove private key
+      # 14. Remove private key from runner
       # ---------------------------------------------------------
       - name: Remove signing key
         if: always()
         run: |
           rm -f extension-key.pem
-
           echo "Signing key removed from runner."
 
       # ---------------------------------------------------------
@@ -189,6 +191,7 @@ jobs:
       # ---------------------------------------------------------
       - name: Get changelog from commits
         id: changelog
+        shell: bash
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
@@ -209,7 +212,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
-
           tag_name: "v${{ steps.version.outputs.VERSION }}"
 
           body: |
