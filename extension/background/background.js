@@ -195,4 +195,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     saveBookmarks(request.bookmarks).then(() => sendResponse({ success: true }));
     return true;
   }
+
+  // Return true for any unrecognized message to prevent channel close errors
+  return true;
 });
