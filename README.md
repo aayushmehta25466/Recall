@@ -1,16 +1,26 @@
-# Bookmarkly
+<p align="center">
+  <a href="README.md"><b>Readme</b></a> · 
+  <a href="CONTRIBUTING.md">Contributing</a> · 
+  <a href="LICENSE">License</a>
+</p>
 
-A Chrome extension (Manifest V3) that brings AI-powered semantic search and automatic categorization to your bookmarks.
+<p align="center">
+  <img src="https://img.shields.io/badge/Chrome-Extension-blue" alt="Chrome Extension">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/Manifest-V3-orange" alt="Manifest V3">
+</p>
 
-![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Manifest V3](https://img.shields.io/badge/Manifest-V3-orange)
+<h1 align="center">Bookmarkly</h1>
+
+<p align="center">
+  A Chrome extension that brings AI-powered semantic search and automatic categorization to your bookmarks.
+</p>
 
 ---
 
 ## What It Does
 
 Bookmarkly keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it into a category and subcategory using AI, and moves it into the right Chrome folder — no manual sorting needed.
-
-**Key capabilities:**
 
 - **Semantic search** — find bookmarks by meaning, not just exact keywords
 - **Auto-categorization** — AI-powered classification into a structured taxonomy
@@ -95,14 +105,9 @@ Bookmarks Bar
 ### Install from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/aayushmehta25466/Bookmarkly.git
 cd Bookmarkly
-
-# Install dependencies
 npm install
-
-# Build the extension
 npm run build
 ```
 
@@ -123,7 +128,9 @@ The built extension will be in the `dist/` folder.
 3. Unzip the file
 4. Open `chrome://extensions/` → Enable **Developer mode** → **Load unpacked** → select the unzipped folder
 
-### Connect an LLM (OpenRouter)
+---
+
+## Connect an LLM (OpenRouter)
 
 Bookmarkly uses [OpenRouter](https://openrouter.ai/) to access AI models for categorization. You need a free API key:
 
@@ -200,7 +207,9 @@ tests/              # Jest tests for core modules
 - Jest (testing)
 - ESM modules throughout
 
-### Releases
+---
+
+## Releases
 
 This project uses GitHub Actions to automate releases. The workflow:
 
@@ -211,9 +220,9 @@ This project uses GitHub Actions to automate releases. The workflow:
 
 ```bash
 # Bump version (updates package.json and creates a git tag)
-npm version patch   # 0.0.1 → 0.0.2
-npm version minor   # 0.0.2 → 0.1.0
-npm version major   # 0.1.0 → 1.0.0
+npm version patch   # 1.0.0 → 1.0.1
+npm version minor   # 1.0.0 → 1.1.0
+npm version major   # 1.0.0 → 2.0.0
 
 # Push the tag to trigger the release workflow
 git push --follow-tags
@@ -223,29 +232,3 @@ This automatically:
 - Syncs the version into `manifest.json`
 - Zips the `dist/` folder as `bookmarkly-X.X.X.zip`
 - Creates a GitHub Release with install instructions
-
----
-
-## License
-
-MIT License
-
-Copyright (c) 2026 Aayush Mehta
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
