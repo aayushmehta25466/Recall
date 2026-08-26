@@ -196,6 +196,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // Return true for any unrecognized message to prevent channel close errors
-  return true;
+  // SYNC_PROGRESS is a broadcast — don't return true, no response needed
+  if (request.type === 'SYNC_PROGRESS') return false;
 });
