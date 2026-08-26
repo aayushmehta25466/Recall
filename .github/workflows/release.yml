@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -10,60 +11,141 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - run: npm ci
-      - run: npm run build
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
 
+      # 4. Build extension
+      - name: Build extension
+        run: npm run build
+
+      # 5. Get version from Git tag
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Bookmarkly version $VERSION"
 
+      # 6. Sync manifest version with Git tag
       - name: Sync manifest version
         run: |
           cd dist
+
           node -e "
             const fs = require('fs');
-            const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+
+            const m = JSON.parse(
+              fs.readFileSync('manifest.json', 'utf8')
+            );
+
             m.version = '${{ steps.version.outputs.VERSION }}';
-            fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2));
+
+            fs.writeFileSync(
+              'manifest.json',
+              JSON.stringify(m, null, 2) + '\n'
+            );
           "
 
-      - name: Create source code zip
-        run: zip -r bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip . -x "node_modules/*" "dist/*" ".git/*"
-
-      - name: Generate extension key
+      # 7. Verify manifest
+      - name: Verify manifest
         run: |
-          openssl genrsa -out extension-key.pem 2048 2>/dev/null
+          echo "Extension manifest:"
+          cat dist/manifest.json
 
+      # 8. Create source ZIP
+      - name: Create source code zip
+        run: |
+          zip -r \
+            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip \
+            . \
+            -x "node_modules/*" \
+               "dist/*" \
+               ".git/*" \
+               "extension-key.pem" \
+               "key.pem" \
+               "*.crx"
+
+      # 9. Restore permanent CRX signing key
+      #
+      # CRX_PRIVATE_KEY_B64 is stored in:
+      # GitHub → Settings → Secrets and variables → Actions
+      #
+      # This restores the SAME private key for every release.
+      - name: Restore CRX private key
+        env:
+          CRX_PRIVATE_KEY_B64: ${{ secrets.CRX_PRIVATE_KEY_B64 }}
+        run: |
+          if [ -z "$CRX_PRIVATE_KEY_B64" ]; then
+            echo "ERROR: CRX_PRIVATE_KEY_B64 secret is not configured."
+            exit 1
+          fi
+
+          printf '%s' "$CRX_PRIVATE_KEY_B64" | base64 --decode > extension-key.pem
+
+          chmod 600 extension-key.pem
+
+          echo "CRX signing key restored successfully."
+
+      # 10. Verify crx3 is installed
+      - name: Verify CRX3 package tool
+        run: |
+          npx crx3 --help
+
+      # 11. Create signed CRX
       - name: Create CRX package
         run: |
-          npx crx pack dist/ -p extension-key.pem -o bookmarkly-${{ steps.version.outputs.VERSION }}.crx
+          npx crx3 dist/ \
+            --key extension-key.pem \
+            --crx bookmarkly-${{ steps.version.outputs.VERSION }}.crx
 
+      # 12. Verify CRX was created
+      - name: Verify CRX package
+        run: |
+          ls -lh bookmarkly-${{ steps.version.outputs.VERSION }}.crx
+
+      # 13. Remove private key from runner
+      - name: Remove signing key
+        if: always()
+        run: |
+          rm -f extension-key.pem
+
+      # 14. Generate changelog
       - name: Get changelog from commits
         id: changelog
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s" HEAD)
           else
-            COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
           fi
+
           echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
           echo "$COMMITS" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
+      # 15. Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
-          tag_name: v${{ steps.version.outputs.VERSION }}
+          tag_name: "v${{ steps.version.outputs.VERSION }}"
+
           body: |
             ## What's New
 
@@ -71,23 +153,43 @@ jobs:
 
             ---
 
-            ## Install
+            ## Downloads
 
-            ### Option 1: Direct Install (CRX)
-            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}.crx` below
+            ### 📦 CRX Extension
+
+            Download:
+
+            `bookmarkly-${{ steps.version.outputs.VERSION }}.crx`
+
+            ### 📁 Source Code
+
+            Download:
+
+            `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip`
+
+            ---
+
+            ## Installation
+
+            ### Option 1: CRX
+
+            1. Download the `.crx` file.
             2. Open `chrome://extensions/`
-            3. Enable **Developer mode** (top-right toggle)
-            4. Drag and drop the `.crx` file onto the extensions page
-            5. Click **Add extension** when prompted
+            3. Enable **Developer mode**.
+            4. Drag the `.crx` file onto the Extensions page.
+            5. Follow Chrome's installation prompt.
 
-            ### Option 2: Load Unpacked (Source)
-            1. Download `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip` below
-            2. Unzip the file
+            ### Option 2: Load Unpacked
+
+            1. Download the source ZIP.
+            2. Extract the ZIP.
             3. Open `chrome://extensions/`
-            4. Enable **Developer mode** (top-right toggle)
-            5. Click **Load unpacked** → select the `dist/` folder from the unzipped source
+            4. Enable **Developer mode**.
+            5. Click **Load unpacked**.
+            6. Select the `dist` folder.
 
-            ### Option 3: Build from Source
+            ### Option 3: Build From Source
+
             ```bash
             git clone https://github.com/aayushmehta25466/Bookmarkly.git
             cd Bookmarkly
@@ -95,13 +197,18 @@ jobs:
             npm install
             npm run build
             ```
-            Then load the `dist/` folder in `chrome://extensions/`.
+
+            Then load the `dist/` folder from:
+
+            `chrome://extensions/`
 
             ---
 
-            **Full Changelog**: https://github.com/aayushmehta25466/Bookmarkly/compare/${{ steps.version.outputs.VERSION }}...v${{ steps.version.outputs.VERSION }}
+            **Version:** `${{ steps.version.outputs.VERSION }}`
+
           files: |
             bookmarkly-${{ steps.version.outputs.VERSION }}.crx
             bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip
+
           draft: false
           prerelease: false
