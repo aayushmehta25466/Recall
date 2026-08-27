@@ -23,7 +23,7 @@ export function createBookmark(data = {}) {
     // Chrome folder path (e.g. "Bookmarks Bar / Development / Frontend")
     chromeFolder: data.chromeFolder || '',
     // Trash fields
-    isTrashed: data.isTrashed || false,
+    isTrashed: data.isTrashed || 0,
     trashedAt: data.trashedAt || null,
     // Sort/reorder fields
     sortOrder: data.sortOrder ?? 0,
