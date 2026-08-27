@@ -47,6 +47,38 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
+// Handle side panel toggle
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
+  // Fallback for browsers without side panel support
+  console.log('Side panel not supported, using popup fallback');
+});
+
+// Handle keyboard shortcut
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-sidebar') {
+    try {
+      const settings = await getSettings();
+      if (settings.viewMode === 'sidebar') {
+        // Toggle side panel
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) {
+          const state = await chrome.sidePanel.getPanelBehavior({ tabId: tab.id });
+          if (state.openPanelOnActionClick) {
+            await chrome.sidePanel.close();
+          } else {
+            await chrome.sidePanel.open({ tabId: tab.id });
+          }
+        }
+      } else {
+        // For popup mode, open options page
+        chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html') });
+      }
+    } catch (e) {
+      console.error('Failed to toggle sidebar:', e);
+    }
+  }
+});
+
 /**
  * New bookmark: instant save with fast rules. AI batch handles rest later.
  */

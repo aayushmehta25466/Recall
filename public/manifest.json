@@ -8,7 +8,8 @@
     "storage",
     "tabs",
     "activeTab",
-    "scripting"
+    "scripting",
+    "sidePanel"
   ],
   "background": {
     "service_worker": "background.js",
@@ -17,7 +18,19 @@
   "action": {
     "default_popup": "extension/popup/popup.html"
   },
+  "side_panel": {
+    "default_path": "extension/sidepanel/sidepanel.html"
+  },
   "options_page": "extension/options/options.html",
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      },
+      "description": "Toggle Bookmark Engine sidebar"
+    }
+  },
   "host_permissions": [
     "http://*/*",
     "https://*/*"

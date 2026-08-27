@@ -5,6 +5,9 @@ const DEFAULT_SETTINGS = {
   openrouterModel: 'google/gemini-2.5-flash-lite',
   // Theme
   theme: 'auto', // 'auto' | 'dark' | 'light'
+  // View mode
+  viewMode: 'sidebar', // 'popup' | 'sidebar'
+  sidePanelPosition: 'right', // 'left' | 'right'
   // Trash
   trashAutoPurgeDays: 30, // 7 | 30 | 0 (never)
   trashMaxSize: 500,

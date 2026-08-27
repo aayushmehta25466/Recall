@@ -510,6 +510,10 @@ async function initSettings() {
   aiTagSuggest.checked = s.aiTagSuggest !== false;
   trashAutoPurge.value = s.trashAutoPurgeDays ?? 30;
   trashMaxSize.value = s.trashMaxSize || 500;
+  // View mode settings
+  panelViewMode.value = s.viewMode || 'sidebar';
+  sidePanelPosition.value = s.sidePanelPosition || 'right';
+  sidePanelPositionGroup.style.display = panelViewMode.value === 'sidebar' ? 'block' : 'none';
   updateAiStatus(s);
 }
 
@@ -538,6 +542,27 @@ semanticSearch.addEventListener('change', () => saveSetting('semanticSearch', se
 aiTagSuggest.addEventListener('change', () => saveSetting('aiTagSuggest', aiTagSuggest.checked));
 trashAutoPurge.addEventListener('change', () => saveSetting('trashAutoPurgeDays', parseInt(trashAutoPurge.value)));
 trashMaxSize.addEventListener('change', () => saveSetting('trashMaxSize', parseInt(trashMaxSize.value)));
+
+// View mode settings
+const panelViewMode = document.getElementById('viewMode');
+const sidePanelPosition = document.getElementById('sidePanelPosition');
+const sidePanelPositionGroup = document.getElementById('sidePanelPositionGroup');
+
+panelViewMode.addEventListener('change', async () => {
+  await saveSetting('viewMode', panelViewMode.value);
+  // Show/hide position setting based on view mode
+  sidePanelPositionGroup.style.display = panelViewMode.value === 'sidebar' ? 'block' : 'none';
+  // Update extension behavior
+  if (panelViewMode.value === 'sidebar') {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  } else {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  }
+});
+
+sidePanelPosition.addEventListener('change', () => {
+  saveSetting('sidePanelPosition', sidePanelPosition.value);
+});
 
 // Sync progress
 chrome.runtime.onMessage.addListener((message) => {

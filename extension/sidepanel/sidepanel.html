@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookmark Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../popup/popup.css">
+  <style>
+    body {
+      width: 100%;
+      height: 100vh;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    #resultsContainer {
+      max-height: calc(100vh - 200px);
+    }
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .sidebar-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .sidebar-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .quick-action-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 2px solid var(--border-default);
+      border-radius: 4px;
+      background: var(--surface-card);
+      color: var(--text-base);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .quick-action-btn:hover {
+      background: var(--surface-raised);
+      border-color: var(--accent-green);
+      transform: translateY(-1px);
+    }
+    .quick-action-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    .category-filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .category-filter {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      background: var(--surface-inset);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .category-filter:hover,
+    .category-filter.active {
+      background: var(--accent-green);
+      color: white;
+      border-color: var(--accent-green);
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      background: var(--surface-inset);
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .stat-value {
+      font-weight: 700;
+      color: var(--text-base);
+    }
+  </style>
+</head>
+<body class="flex flex-col bg-surface-base text-text-base font-primary">
+  <header class="sidebar-header">
+    <div class="sidebar-title">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-accent-green"></span>
+      Bookmark Engine
+    </div>
+    <div class="sidebar-actions">
+      <button id="homeBtn" title="Open Home" class="p-2 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+      </button>
+      <button id="settingsBtn" title="Open Settings" class="p-2 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </button>
+      <button id="closeBtn" title="Close sidebar" class="p-2 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-red transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="relative mb-3">
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search bookmarks... (Ctrl+K)"
+      class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-4 py-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]"
+      autocomplete="off"
+      autofocus
+    >
+    <div id="searchHistory" class="hidden absolute top-full left-0 right-0 mt-1 bg-surface-card border-2 border-border-default rounded-sm shadow-clay z-50 max-h-48 overflow-y-auto"></div>
+  </div>
+
+  <div id="statsBar" class="stats-bar">
+    <div class="stat-item">
+      <span>Total:</span>
+      <span id="totalCount" class="stat-value">0</span>
+    </div>
+    <div class="stat-item">
+      <span>Categories:</span>
+      <span id="categoryCount" class="stat-value">0</span>
+    </div>
+    <div class="stat-item">
+      <span>Uncategorized:</span>
+      <span id="uncategorizedCount" class="stat-value">0</span>
+    </div>
+  </div>
+
+  <div id="quickActions" class="quick-actions">
+    <button id="organizeBtn" class="quick-action-btn" title="Organize all bookmarks with AI">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Organize All
+    </button>
+    <button id="categorizeBtn" class="quick-action-btn" title="Categorize uncategorized bookmarks with AI">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      Categorize
+    </button>
+    <button id="trashBtn" class="quick-action-btn" title="View trash">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      Trash
+    </button>
+  </div>
+
+  <div id="categoryFilters" class="category-filters">
+    <button class="category-filter active" data-category="all">All</button>
+  </div>
+
+  <div id="actionBar" class="hidden items-center gap-2 p-2 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base mb-3"></div>
+
+  <div id="resultsContainer" class="flex-1 overflow-y-auto pr-2 flex flex-col gap-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-muted [&::-webkit-scrollbar-thumb]:rounded-xs">
+    <div class="flex items-center justify-center h-full text-text-secondary text-sm">
+      Start typing to search your knowledge base...
+    </div>
+  </div>
+
+  <script type="module" src="./sidepanel.js"></script>
+</body>
+</html>

@@ -177,6 +177,31 @@
         </select>
       </section>
 
+      <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base border-t-[3px] border-t-accent-purple">
+        <h2 class="text-md font-extrabold tracking-tight text-text-base">Interface</h2>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Choose how Bookmark Engine opens when you click the extension icon.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm text-text-base mb-1 font-semibold">View Mode</label>
+            <select id="viewMode" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+              <option value="sidebar">Sidebar (recommended)</option>
+              <option value="popup">Popup (classic)</option>
+            </select>
+            <p class="text-xs text-text-secondary mt-1">Sidebar stays open while you browse. Popup closes when you click outside.</p>
+          </div>
+          <div id="sidePanelPositionGroup">
+            <label class="block text-sm text-text-base mb-1 font-semibold">Sidebar Position</label>
+            <select id="sidePanelPosition" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
+              <option value="right">Right side</option>
+              <option value="left">Left side</option>
+            </select>
+          </div>
+          <div class="bg-surface-inset rounded-sm p-3 text-xs text-text-secondary">
+            <strong>Keyboard Shortcut:</strong> <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Ctrl+Shift+B</kbd> (or <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Cmd+Shift+B</kbd> on Mac)
+          </div>
+        </div>
+      </section>
+
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base border-t-[3px] border-t-accent-red">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Duplicate Policy</h2>
         <select id="duplicatePolicy" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer mt-space-3">
