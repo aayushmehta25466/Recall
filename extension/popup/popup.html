@@ -32,13 +32,16 @@
   </header>
 
   <main class="flex-1 flex flex-col gap-space-3 min-h-0">
-    <input
-      type="text"
-      id="searchInput"
-      placeholder="Search bookmarks..."
-      class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-space-4 py-space-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]"
-      autocomplete="off"
-    >
+    <div class="relative">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search bookmarks..."
+        class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-space-4 py-space-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]"
+        autocomplete="off"
+      >
+      <div id="searchHistory" class="hidden absolute top-full left-0 right-0 mt-1 bg-surface-card border-2 border-border-default rounded-sm shadow-clay z-50 max-h-48 overflow-y-auto"></div>
+    </div>
 
     <div id="actionBar" class="hidden items-center gap-space-2 p-space-3 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base"></div>
 

@@ -17,7 +17,7 @@ jest.unstable_mockModule('../core/search-engine/semantic.js', () => ({
 }));
 
 const { getActiveBookmarks } = await import('../database/indexeddb/db.js');
-const { searchBookmarks } = await import('../core/search-index/search.js');
+const { searchBookmarks, buildSearchIndex, clearSearchIndex } = await import('../core/search-index/search.js');
 
 const mockBookmarks = [
   {
@@ -27,7 +27,7 @@ const mockBookmarks = [
     category: 'Development',
     subcategory: 'Frontend',
     keywords: ['react', 'javascript', 'ui'],
-    tags: [],
+    tags: ['react', 'javascript'],
     dateAdded: '2024-01-15T10:00:00Z',
   },
   {
@@ -37,7 +37,7 @@ const mockBookmarks = [
     category: 'Learning',
     subcategory: 'Blogs',
     keywords: ['react', 'tutorial', 'learning'],
-    tags: [],
+    tags: ['tutorial', 'learning'],
     dateAdded: '2024-02-20T10:00:00Z',
   },
   {
@@ -47,14 +47,16 @@ const mockBookmarks = [
     category: 'Development',
     subcategory: 'Learning',
     keywords: ['react', 'useeffect'],
-    tags: [],
+    tags: ['react', 'hooks'],
     dateAdded: '2024-03-10T10:00:00Z',
   },
 ];
 
 describe('Search Engine', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     getActiveBookmarks.mockResolvedValue(mockBookmarks);
+    clearSearchIndex();
+    await buildSearchIndex();
   });
 
   test('should return latest 50 when query is empty', async () => {
@@ -104,7 +106,36 @@ describe('Search Engine', () => {
 
   test('should handle null/undefined bookmarks gracefully', async () => {
     getActiveBookmarks.mockResolvedValue([]);
+    clearSearchIndex();
+    await buildSearchIndex();
     const results = await searchBookmarks('test');
     expect(results).toHaveLength(0);
+  });
+
+  test('should support fuzzy matching (typos)', async () => {
+    // "reacr" is a typo for "react"
+    const results = await searchBookmarks('reacr');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some(b => b.url.includes('react'))).toBe(true);
+  });
+
+  test('should support prefix matching', async () => {
+    // "react" should match "reactjs" if it existed
+    const results = await searchBookmarks('rea');
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  test('should return results with _score property', async () => {
+    const results = await searchBookmarks('React');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]).toHaveProperty('_score');
+    expect(results[0]._score).toBeGreaterThan(0);
+  });
+
+  test('should rank title matches higher than description matches', async () => {
+    const results = await searchBookmarks('React');
+    expect(results.length).toBeGreaterThan(0);
+    // Title match should be first
+    expect(results[0].url).toBe('https://github.com/facebook/react');
   });
 });

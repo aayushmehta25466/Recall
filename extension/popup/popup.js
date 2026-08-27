@@ -8,10 +8,48 @@ chrome.storage.sync.get('settings', (data) => {
   document.documentElement.classList.toggle('light', !isDark);
 });
 
+// Search history helper (inline to avoid module loading issues in popup)
+const HISTORY_KEY = 'searchHistory';
+const MAX_HISTORY = 20;
+
+async function getSearchHistory() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(HISTORY_KEY, (data) => {
+      resolve(data[HISTORY_KEY] || []);
+    });
+  });
+}
+
+async function addToHistory(query) {
+  if (!query || query.trim().length < 2) return;
+  const trimmed = query.trim();
+  const history = await getSearchHistory();
+  const filtered = history.filter(h => h.query !== trimmed);
+  filtered.unshift({ query: trimmed, timestamp: Date.now() });
+  const limited = filtered.slice(0, MAX_HISTORY);
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [HISTORY_KEY]: limited }, resolve);
+  });
+}
+
+async function removeFromHistory(query) {
+  const history = await getSearchHistory();
+  const filtered = history.filter(h => h.query !== query);
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [HISTORY_KEY]: filtered }, resolve);
+  });
+}
+
+async function getRecentQueries(limit = 5) {
+  const history = await getSearchHistory();
+  return history.slice(0, limit).map(h => h.query);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const resultsContainer = document.getElementById('resultsContainer');
   const actionBar = document.getElementById('actionBar');
+  const searchHistory = document.getElementById('searchHistory');
   const selectedUrls = new Set();
 
   // Navigation buttons
@@ -33,11 +71,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  searchInput.addEventListener('input', (e) => {
+  searchInput.addEventListener('input', async (e) => {
     const query = e.target.value.trim();
     selectedUrls.clear();
 
     if (query.length > 0) {
+      // Hide history dropdown when typing
+      searchHistory.classList.add('hidden');
+
+      // Save to history
+      await addToHistory(query);
+
       chrome.runtime.sendMessage({ type: 'SEARCH', query }, (response) => {
         if (response && response.results) {
           renderResults(response.results);
@@ -52,6 +96,57 @@ document.addEventListener('DOMContentLoaded', () => {
       hideActionBar();
     }
   });
+
+  // Show search history on focus
+  searchInput.addEventListener('focus', async () => {
+    if (searchInput.value.trim().length === 0) {
+      const queries = await getRecentQueries(10);
+      if (queries.length > 0) {
+        renderSearchHistory(queries);
+        searchHistory.classList.remove('hidden');
+      }
+    }
+  });
+
+  // Hide history when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchHistory.contains(e.target)) {
+      searchHistory.classList.add('hidden');
+    }
+  });
+
+  function renderSearchHistory(queries) {
+    searchHistory.innerHTML = queries.map(q => `
+      <div class="flex items-center justify-between px-3 py-2 hover:bg-surface-raised cursor-pointer group">
+        <span class="text-sm text-text-base">${q}</span>
+        <button class="text-text-secondary hover:text-accent-red opacity-0 group-hover:opacity-100 transition-opacity" data-remove="${q}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Click to search
+    searchHistory.querySelectorAll('[class*="hover:bg"]').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        const removeBtn = e.target.closest('[data-remove]');
+        if (removeBtn) {
+          const query = removeBtn.dataset.remove;
+          await removeFromHistory(query);
+          const updated = await getRecentQueries(10);
+          if (updated.length > 0) {
+            renderSearchHistory(updated);
+          } else {
+            searchHistory.classList.add('hidden');
+          }
+          return;
+        }
+        const query = el.querySelector('span').textContent;
+        searchInput.value = query;
+        searchHistory.classList.add('hidden');
+        searchInput.dispatchEvent(new Event('input'));
+      });
+    });
+  }
 
   function renderActionBar(count) {
     const btn = 'flex items-center gap-1 text-xs font-bold border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast min-h-[32px] px-2 py-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';

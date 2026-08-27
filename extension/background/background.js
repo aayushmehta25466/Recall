@@ -3,7 +3,7 @@ import { inferContentType } from '../../core/metadata-extractor/inferrence.js';
 import { classifyFast, runBulkSync } from '../../core/sync-engine/bulk.js';
 import { createBookmark } from '../../shared/types/bookmark.js';
 import { saveBookmark, getBookmark, updateBookmark, trashBookmark, restoreBookmark, emptyTrash, purgeOldTrash, getTrashedBookmarks, getAllBookmarks, saveBookmarks } from '../../database/indexeddb/db.js';
-import { searchBookmarks } from '../../core/search-index/search.js';
+import { searchBookmarks, buildSearchIndex } from '../../core/search-index/search.js';
 import { getSettings } from '../../shared/settings.js';
 
 console.log('Bookmark Search Engine: Background worker initialized.');
@@ -37,6 +37,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       const purged = await purgeOldTrash(maxAge);
       if (purged > 0) console.log(`Auto-purged ${purged} old trashed bookmarks.`);
     }
+  }
+  // Build search index on startup
+  try {
+    const { count } = await buildSearchIndex();
+    console.log(`Search index built: ${count} bookmarks`);
+  } catch (e) {
+    console.error('Failed to build search index:', e);
   }
 });
 
@@ -149,9 +156,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'START_BULK_SYNC') {
     console.log('Starting bulk sync from message...');
     isSyncing = true;
-    runBulkSync(true).then(() => {
+    runBulkSync(true).then(async () => {
       isSyncing = false;
-      console.log('Bulk sync finished, sending response');
+      console.log('Bulk sync finished, rebuilding search index...');
+      try {
+        const { count } = await buildSearchIndex();
+        console.log(`Search index rebuilt: ${count} bookmarks`);
+      } catch (e) {
+        console.error('Failed to rebuild search index:', e);
+      }
       sendResponse({ success: true });
     }).catch(e => {
       isSyncing = false;
