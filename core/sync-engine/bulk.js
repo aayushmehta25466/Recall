@@ -11,6 +11,9 @@ import { getSettings } from '../../shared/settings.js';
 
 const SKIP_PROTOCOLS = ['chrome:', 'chrome-extension:', 'about:', 'file:', 'javascript:'];
 const SKIP_DOMAINS = ['chromewebstore.google.com', 'chrome.google.com'];
+// ponytail: 10 concurrent fetches — fast enough to not hammer servers,
+// slow enough to avoid Chrome extension fetch quotas.
+const CONCURRENT_LIMIT = 10;
 
 function canFetch(url) {
   try {
@@ -25,7 +28,6 @@ function canFetch(url) {
 
 function flattenTree(nodes, parentPath = '', arr = []) {
   for (const node of nodes) {
-    // Build folder path: skip root nodes (id "0", "1", "2")
     const currentPath = (node.id && !node.url && node.title && !['0', '1', '2'].includes(node.id))
       ? (parentPath ? `${parentPath} / ${node.title}` : node.title)
       : parentPath;
@@ -54,19 +56,16 @@ function sendProgress(current, total, url) {
  * Used for instant save during sync and new bookmark creation.
  */
 export function classifyFast(metadata, url, settings) {
-  // 1. Custom domain mappings
   if (settings.customDomainMappings?.[metadata.domain]) {
     const custom = settings.customDomainMappings[metadata.domain];
     return { category: custom.category, subcategory: custom.subcategory || '' };
   }
 
-  // 2. Built-in domain mappings
   const domainMatch = getDomainMapping(metadata.domain);
   if (domainMatch) {
     return { category: domainMatch.category, subcategory: domainMatch.subcategory };
   }
 
-  // 3. Keyword scoring
   const fullText = `${metadata.title} ${metadata.description} ${metadata.keywords.join(' ')} ${url}`;
   const scores = getScoreForKeywords(fullText);
   let topScore = 0;
@@ -87,13 +86,11 @@ export function classifyFast(metadata, url, settings) {
 
 /**
  * Full classification: fast rules → AI fallback.
- * Used by batch categorizer for uncategorized bookmarks.
  */
 export async function classifyBookmark(metadata, url, settings) {
   const fast = classifyFast(metadata, url, settings);
   if (fast.category !== 'Uncategorized') return fast;
 
-  // AI fallback
   if (settings.openrouterApiKey) {
     const aiResult = await classifyWithAI({ ...metadata, url }, settings);
     if (aiResult) {
@@ -117,8 +114,81 @@ async function fetchHtml(url) {
 }
 
 /**
- * Bulk sync: Phase 1 — save all to IndexedDB with fast classification.
- * Phase 2 — move in Chrome after all saved.
+ * Process a single bookmark: fetch metadata, classify, save to IndexedDB.
+ * Returns { chromeId, category, subcategory } for Chrome folder move, or null.
+ */
+async function processBookmark(node, settings, processedUrls) {
+  const norm = normalizeUrl(node.url);
+  if (processedUrls.has(norm)) return null;
+  processedUrls.add(norm);
+
+  if (!canFetch(node.url)) {
+    const bookmarkObj = createBookmark({
+      url: node.url,
+      title: node.title,
+      chromeFolder: node.chromeFolder || '',
+      category: 'Uncategorized',
+      dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
+    });
+    await saveBookmark(bookmarkObj);
+    return null;
+  }
+
+  // Preserve existing categories — never wipe AI/user-categorized bookmarks.
+  const existing = await getBookmark(node.url);
+  const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
+
+  // Single fetch — no duplicate!
+  const html = await fetchHtml(node.url);
+  const metadata = extractMetadata(html, node.url);
+  const contentType = inferContentType(metadata, node.url);
+
+  let category, subcategory;
+  if (hasRealCategory) {
+    category = existing.category;
+    subcategory = existing.subcategory || '';
+  } else {
+    ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
+  }
+
+  const bookmarkObj = createBookmark({
+    url: node.url,
+    title: metadata.title || node.title,
+    description: metadata.description,
+    siteName: metadata.siteName,
+    domain: metadata.domain,
+    language: metadata.language,
+    author: metadata.author,
+    keywords: metadata.keywords,
+    contentType,
+    category,
+    subcategory,
+    chromeFolder: node.chromeFolder || '',
+    dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
+  });
+
+  await saveBookmark(bookmarkObj);
+  return { chromeId: node.id, category, subcategory };
+}
+
+/**
+ * Run N promises concurrently with a limit.
+ */
+async function mapWithLimit(items, limit, fn) {
+  const results = [];
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+/**
+ * Bulk sync with parallel fetching and Chrome moves.
  */
 export async function runBulkSync(moveInChrome = true) {
   console.log('Starting bulk sync...');
@@ -131,100 +201,46 @@ export async function runBulkSync(moveInChrome = true) {
   sendProgress(0, total, '');
 
   const processedUrls = new Set();
-  const moveToQueue = [];
-  let current = 0;
+  let processed = 0;
   let saved = 0;
   let skipped = 0;
   let failed = 0;
+  const moveToQueue = [];
 
-  // ─── Phase 1: Fetch + classify fast + save to IndexedDB ───
-  for (const node of allBookmarks) {
-    current++;
-    const norm = normalizeUrl(node.url);
-    if (processedUrls.has(norm)) {
-      skipped++;
-      sendProgress(current, total, node.url);
-      continue;
-    }
-    processedUrls.add(norm);
-
-    if (!canFetch(node.url)) {
-      const bookmarkObj = createBookmark({
-        url: node.url,
-        title: node.title,
-        chromeFolder: node.chromeFolder || '',
-        category: 'Uncategorized',
-        dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
-      });
-      await saveBookmark(bookmarkObj);
-      saved++;
-      sendProgress(current, total, node.url);
-      continue;
-    }
-
+  // Phase 1: Process bookmarks concurrently (fetch + classify + save)
+  const results = await mapWithLimit(allBookmarks, CONCURRENT_LIMIT, async (node, idx) => {
     try {
-      // Preserve existing categories — never wipe AI/user-categorized bookmarks.
-      // Uncategorized (or missing) records get re-classified on every sync.
-      const existing = await getBookmark(node.url);
-      const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
-
-      let category, subcategory;
-      if (hasRealCategory) {
-        category = existing.category;
-        subcategory = existing.subcategory || '';
-      } else {
-        const html = await fetchHtml(node.url);
-        const metadata = extractMetadata(html, node.url);
-        ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
+      const result = await processBookmark(node, settings, processedUrls);
+      processed++;
+      if (result) {
+        saved++;
+        moveToQueue.push(result);
+      } else if (processedUrls.has(normalizeUrl(node.url))) {
+        skipped++;
       }
-
-      const html = await fetchHtml(node.url);
-      const metadata = extractMetadata(html, node.url);
-      const contentType = inferContentType(metadata, node.url);
-
-      const bookmarkObj = createBookmark({
-        url: node.url,
-        title: metadata.title || node.title,
-        description: metadata.description,
-        siteName: metadata.siteName,
-        domain: metadata.domain,
-        language: metadata.language,
-        author: metadata.author,
-        keywords: metadata.keywords,
-        contentType,
-        category,
-        subcategory,
-        chromeFolder: node.chromeFolder || '',
-        dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
-      });
-
-      await saveBookmark(bookmarkObj);
-      saved++;
-
-      if (moveInChrome && node.id) {
-        moveToQueue.push({ chromeId: node.id, category, subcategory });
-      }
-
-      sendProgress(current, total, node.url);
+      sendProgress(processed, total, node.url);
+      return result;
     } catch (e) {
+      processed++;
       failed++;
       console.warn('Failed on', node.url, e);
-      sendProgress(current, total, node.url);
+      sendProgress(processed, total, node.url);
+      return null;
     }
-  }
+  });
 
   console.log(`Bulk sync phase 1 done: ${saved} saved, ${skipped} skipped (dupes), ${failed} failed`);
 
-  // ─── Phase 2: Move bookmarks in Chrome (after all saved to DB) ───
-  if (moveToQueue.length > 0) {
+  // Phase 2: Move bookmarks in Chrome concurrently
+  if (moveInChrome && moveToQueue.length > 0) {
     console.log(`Phase 2: Moving ${moveToQueue.length} bookmarks in Chrome...`);
-    for (const { chromeId, category, subcategory } of moveToQueue) {
+    await mapWithLimit(moveToQueue, CONCURRENT_LIMIT, async ({ chromeId, category, subcategory }) => {
       try {
         await moveBookmarkToCategory(chromeId, category, subcategory);
       } catch (e) {
         console.warn('Failed to move bookmark:', chromeId, e);
       }
-    }
+    });
     await cleanupEmptyFolders();
   }
 
