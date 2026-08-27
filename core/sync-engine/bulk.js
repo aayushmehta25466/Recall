@@ -8,6 +8,7 @@ import { saveBookmark, getBookmark } from '../../database/indexeddb/db.js';
 import { moveBookmarkToCategory, cleanupEmptyFolders } from '../folder-manager/manager.js';
 import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
+import { validateSubcategory } from '../taxonomy/categories.js';
 
 const SKIP_PROTOCOLS = ['chrome:', 'chrome-extension:', 'about:', 'file:', 'javascript:'];
 const SKIP_DOMAINS = ['chromewebstore.google.com', 'chrome.google.com'];
@@ -56,16 +57,23 @@ function sendProgress(current, total, url) {
  * Used for instant save during sync and new bookmark creation.
  */
 export function classifyFast(metadata, url, settings) {
+  // 1. Custom domain mappings
   if (settings.customDomainMappings?.[metadata.domain]) {
     const custom = settings.customDomainMappings[metadata.domain];
-    return { category: custom.category, subcategory: custom.subcategory || '' };
+    const cat = custom.category;
+    const sub = validateSubcategory(cat, custom.subcategory || '');
+    return { category: cat, subcategory: sub };
   }
 
+  // 2. Built-in domain mappings
   const domainMatch = getDomainMapping(metadata.domain);
   if (domainMatch) {
-    return { category: domainMatch.category, subcategory: domainMatch.subcategory };
+    const cat = domainMatch.category;
+    const sub = validateSubcategory(cat, domainMatch.subcategory);
+    return { category: cat, subcategory: sub };
   }
 
+  // 3. Keyword scoring — keys are now "Category/Group/Leaf"
   const fullText = `${metadata.title} ${metadata.description} ${metadata.keywords.join(' ')} ${url}`;
   const scores = getScoreForKeywords(fullText);
   let topScore = 0;
@@ -77,8 +85,11 @@ export function classifyFast(metadata, url, settings) {
     }
   }
   if (topKey) {
-    const [cat, subcat] = topKey.split('/');
-    return { category: cat, subcategory: subcat };
+    // Key format: "Development/Web / Frontend" — split on first "/" only
+    const firstSlash = topKey.indexOf('/');
+    const cat = topKey.substring(0, firstSlash);
+    const sub = topKey.substring(firstSlash + 1);
+    return { category: cat, subcategory: validateSubcategory(cat, sub) };
   }
 
   return { category: 'Uncategorized', subcategory: '' };

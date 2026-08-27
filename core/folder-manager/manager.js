@@ -69,7 +69,9 @@ export async function moveBookmarkToCategory(bookmarkId, category, subcategory) 
 }
 
 /**
- * After all bookmarks are organized, clean up empty source folders.
+ * Recursively delete empty folders throughout the bookmarks tree.
+ * Keeps "Engine Organized" and its category/group structure intact.
+ * Cleans up old empty folders anywhere (user's original structure).
  */
 export async function cleanupEmptyFolders() {
   try {
@@ -77,20 +79,21 @@ export async function cleanupEmptyFolders() {
     const barNode = getBookmarksBarNode(rootTree);
     if (!barNode) return;
 
-    // Don't delete the Engine Organized folder itself
-    const engineRoot = (await chrome.bookmarks.getChildren(barNode.id))
-      .find(n => n.title === 'Engine Organized');
-    if (!engineRoot) return;
-
-    // Check each category folder under Engine Organized
-    const categories = await chrome.bookmarks.getChildren(engineRoot.id);
-    for (const cat of categories) {
-      const children = await chrome.bookmarks.getChildren(cat.id);
-      // If category folder is empty, delete it
-      if (children.length === 0) {
-        await chrome.bookmarks.removeTree(cat.id);
+    // Recursively find and delete empty folders
+    async function cleanNode(nodeId) {
+      const children = await chrome.bookmarks.getChildren(nodeId);
+      for (const child of children) {
+        if (child.url) continue; // Skip bookmarks, only process folders
+        await cleanNode(child.id); // Recurse into subfolders first
+        // After recursion, check if this folder is now empty
+        const remaining = await chrome.bookmarks.getChildren(child.id);
+        if (remaining.length === 0 && child.title !== 'Engine Organized') {
+          await chrome.bookmarks.removeTree(child.id);
+        }
       }
     }
+
+    await cleanNode(barNode.id);
   } catch (e) {
     console.warn('Cleanup failed:', e);
   }

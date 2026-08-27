@@ -61,10 +61,10 @@ describe('Taxonomy Phase 1', () => {
     const text = 'This is a react frontend tutorial for developers.';
     const scores = getScoreForKeywords(text);
     
-    // 'react' and 'frontend' should match Development/Frontend
-    // 'tutorial' should match Learning/Tutorials
-    expect(scores[`${CATEGORIES.DEVELOPMENT}/Frontend`]).toBeGreaterThan(0);
-    expect(scores[`${CATEGORIES.LEARNING}/Tutorials`]).toBeGreaterThan(0);
-    expect(scores[`${CATEGORIES.DEVELOPMENT}/Frontend`]).toBe(40); // 2 matches * 20 weight
+    // 'react' and 'frontend' should match Development/Web/Frontend
+    // 'tutorial' should match Learning/Content/Tutorials
+    expect(scores[`${CATEGORIES.DEVELOPMENT}/Web / Frontend`]).toBeGreaterThan(0);
+    expect(scores[`${CATEGORIES.LEARNING}/Content / Tutorials`]).toBeGreaterThan(0);
+    expect(scores[`${CATEGORIES.DEVELOPMENT}/Web / Frontend`]).toBe(40); // 2 matches * 20 weight
   });
 });
