@@ -926,6 +926,8 @@ batchCategorizeBtn.addEventListener('click', async () => {
     if (errors && errors.length > 0) {
       batchStatus.textContent = `Failed: ${categorized}/${processed} categorized. First error: ${errors[0]}`;
       console.error('Batch categorize errors:', errors);
+    } else if (processed === 0) {
+      batchStatus.textContent = 'No uncategorized bookmarks found.';
     } else {
       batchStatus.textContent = `Done! Categorized ${categorized} of ${processed} bookmarks.`;
     }

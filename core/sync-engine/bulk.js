@@ -109,6 +109,8 @@ export async function classifyBookmark(metadata, url, settings) {
     }
   }
 
+  // Log why this bookmark is uncategorized
+  console.log(`Uncategorized: ${url} (domain: ${metadata.domain}, title: ${metadata.title?.substring(0, 50)})`);
   return fast;
 }
 
@@ -145,7 +147,7 @@ async function processBookmark(node, settings, processedUrls) {
     return null;
   }
 
-  // Preserve existing categories — never wipe AI/user-categorized bookmarks.
+  // Preserve existing categories — but reclassify if Uncategorized
   const existing = await getBookmark(node.url);
   const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
 
@@ -156,9 +158,11 @@ async function processBookmark(node, settings, processedUrls) {
 
   let category, subcategory;
   if (hasRealCategory) {
+    // Keep existing real category
     category = existing.category;
     subcategory = existing.subcategory || '';
   } else {
+    // Classify (fast rules + AI if needed)
     ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
   }
 

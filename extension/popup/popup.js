@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderActionBar(count) {
     const btn = 'flex items-center gap-1 text-xs font-bold border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast min-h-[32px] px-2 py-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
     const btnPrimary = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-border-strong');
+    const btnDanger = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-accent-red');
     actionBar.className = 'flex items-center gap-2 p-2 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base';
     actionBar.innerHTML = `
       <span id="selectedInfo" class="flex items-center gap-1 text-xs font-bold text-accent-green min-w-[28px]">
@@ -173,11 +174,16 @@ document.addEventListener('DOMContentLoaded', () => {
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         <span id="openSelectedLabel">0</span>
       </button>
+      <button id="trashSelectedBtn" class="${btnDanger} hidden" title="Move selected to trash">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        <span id="trashSelectedLabel">0</span>
+      </button>
     `;
     document.getElementById('selectAllResultsBtn').addEventListener('click', selectAllResults);
     document.getElementById('deselectAllResultsBtn').addEventListener('click', deselectAllResults);
     document.getElementById('openAllBtn').addEventListener('click', openAll);
     document.getElementById('openSelectedBtn').addEventListener('click', openSelected);
+    document.getElementById('trashSelectedBtn').addEventListener('click', trashSelected);
     updateActionBar();
   }
 
@@ -190,13 +196,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const countEl = document.getElementById('selectedCount');
     const openSelectedBtn = document.getElementById('openSelectedBtn');
     const openSelectedLabel = document.getElementById('openSelectedLabel');
+    const trashSelectedBtn = document.getElementById('trashSelectedBtn');
+    const trashSelectedLabel = document.getElementById('trashSelectedLabel');
     const count = selectedUrls.size;
     countEl.textContent = count;
     if (count > 0) {
       openSelectedBtn.classList.remove('hidden');
       openSelectedLabel.textContent = count;
+      trashSelectedBtn.classList.remove('hidden');
+      trashSelectedLabel.textContent = count;
     } else {
       openSelectedBtn.classList.add('hidden');
+      trashSelectedBtn.classList.add('hidden');
     }
   }
 
@@ -210,6 +221,34 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedUrls.clear();
     updateActionBar();
     resultsContainer.querySelectorAll('.result-check').forEach(cb => cb.checked = false);
+  }
+
+  function trashSelected() {
+    if (selectedUrls.size === 0) return;
+    
+    const count = selectedUrls.size;
+    const confirmed = confirm(`Move ${count} bookmark${count > 1 ? 's' : ''} to trash?`);
+    if (!confirmed) return;
+
+    const urls = [...selectedUrls];
+    let trashed = 0;
+    urls.forEach(url => {
+      chrome.runtime.sendMessage({ type: 'TRASH_BOOKMARK', url }, () => {
+        trashed++;
+        // Remove card from DOM
+        const card = resultsContainer.querySelector(`[data-url="${url}"]`);
+        if (card) {
+          card.style.transition = 'opacity 0.2s, transform 0.2s';
+          card.style.opacity = '0';
+          card.style.transform = 'translateX(20px)';
+          setTimeout(() => card.remove(), 200);
+        }
+        if (trashed === urls.length) {
+          selectedUrls.clear();
+          updateActionBar();
+        }
+      });
+    });
   }
 
   function selectAllResults() {
@@ -256,6 +295,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ${result.category ? `<span class="${BADGE} text-xs">${result.category} ${result.subcategory ? '/ ' + result.subcategory : ''}</span>` : ''}
           </div>
         </div>
+        <div class="flex flex-col gap-1 shrink-0">
+          <button class="open-btn p-1.5 rounded-sm text-text-secondary hover:text-accent-green hover:bg-surface-raised transition-colors" title="Open in new tab">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </button>
+          <button class="remove-btn p-1.5 rounded-sm text-text-secondary hover:text-accent-red hover:bg-surface-raised transition-colors" title="Move to trash">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
       </article>
     `).join('');
 
@@ -264,6 +311,31 @@ document.addEventListener('DOMContentLoaded', () => {
       el.addEventListener('click', () => {
         const url = el.closest('[data-url]').dataset.url;
         chrome.tabs.create({ url });
+      });
+    });
+
+    // Open button
+    resultsContainer.querySelectorAll('.open-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = btn.closest('[data-url]').dataset.url;
+        chrome.tabs.create({ url });
+      });
+    });
+
+    // Remove button (single bookmark - direct trash, no confirm)
+    resultsContainer.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const url = btn.closest('[data-url]').dataset.url;
+        chrome.runtime.sendMessage({ type: 'TRASH_BOOKMARK', url }, () => {
+          // Remove card from DOM with animation
+          const card = btn.closest('[data-url]');
+          card.style.transition = 'opacity 0.2s, transform 0.2s';
+          card.style.opacity = '0';
+          card.style.transform = 'translateX(20px)';
+          setTimeout(() => card.remove(), 200);
+        });
       });
     });
 
