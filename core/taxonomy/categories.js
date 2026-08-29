@@ -65,18 +65,6 @@ export function flattenSubcategoryPaths(category) {
 }
 
 /**
- * Get all valid subcategory paths across all categories.
- * Returns { category: ["Group / Leaf", ...], ... }
- */
-export function getAllPaths() {
-  const result = {};
-  for (const category of Object.keys(taxonomyTree)) {
-    result[category] = flattenSubcategoryPaths(category);
-  }
-  return result;
-}
-
-/**
  * Validate a subcategory path against the taxonomy.
  * Accepts exact match or leaf-only match (backwards compat for old flat values).
  * Returns the canonical path or empty string if invalid.

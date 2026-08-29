@@ -78,29 +78,6 @@ export async function getActiveBookmarks() {
 }
 
 /**
- * Get all non-trashed bookmarks count using index cursor.
- * Much faster than loading all records for counting.
- */
-export async function getBookmarkCount() {
-  const db = await initDB();
-  let count = 0;
-  const tx = db.transaction(STORE_NAME, 'readonly');
-  const index = tx.store.index('isTrashed');
-  // Count non-trashed (0) and undefined (legacy)
-  count += await index.count(0);
-  // Also count records where isTrashed is not set (legacy)
-  const cursor = await tx.store.openCursor();
-  if (cursor) {
-    let c = cursor;
-    while (c) {
-      if (!c.value.isTrashed) count++;
-      c = await c.continue();
-    }
-  }
-  return count;
-}
-
-/**
  * Get bookmarks by category using the compound index.
  * Much faster than loading all bookmarks and filtering.
  */

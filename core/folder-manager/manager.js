@@ -15,8 +15,11 @@ async function getOrCreateFolder(parentId, title) {
  */
 function getBookmarksBarNode(rootTree) {
   const root = rootTree[0];
-  // First child is always the Bookmarks Bar
-  return root.children[0];
+  // Find by ID "1" (Chrome always uses "1" for Bookmarks Bar)
+  const bar = root.children?.find(n => n.id === '1');
+  if (bar) return bar;
+  // Fallback: first child that isn't a URL
+  return root.children?.find(n => !n.url) || root.children[0];
 }
 
 /**

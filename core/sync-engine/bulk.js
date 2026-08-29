@@ -10,8 +10,11 @@ import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
 import { validateSubcategory } from '../taxonomy/categories.js';
 
+import { CATEGORIES } from '../../shared/types/taxonomy.js';
+
 const SKIP_PROTOCOLS = ['chrome:', 'chrome-extension:', 'about:', 'file:', 'javascript:'];
 const SKIP_DOMAINS = ['chromewebstore.google.com', 'chrome.google.com'];
+const VALID_CATEGORIES = Object.values(CATEGORIES);
 // ponytail: 10 concurrent fetches — fast enough to not hammer servers,
 // slow enough to avoid Chrome extension fetch quotas.
 const CONCURRENT_LIMIT = 10;
@@ -147,43 +150,76 @@ async function processBookmark(node, settings, processedUrls) {
     return null;
   }
 
+  // Check if bookmark is already in an Engine Organized folder
+  const chromeFolder = node.chromeFolder || '';
+  let isOrganized = chromeFolder.startsWith('Engine Organized');
+
   // Preserve existing categories — but reclassify if Uncategorized
   const existing = await getBookmark(node.url);
   const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
 
-  // Single fetch — no duplicate!
-  const html = await fetchHtml(node.url);
-  const metadata = extractMetadata(html, node.url);
-  const contentType = inferContentType(metadata, node.url);
-
   let category, subcategory;
-  if (hasRealCategory) {
-    // Keep existing real category
+
+  if (isOrganized) {
+    // Extract category/subcategory from Chrome folder path
+    // "Engine Organized / Development / Web / Frontend" → category="Development", subcategory="Web / Frontend"
+    const parts = chromeFolder.split(' / ').map(s => s.trim()).filter(Boolean);
+    // Skip "Engine Organized" (index 0), category is index 1, rest is subcategory
+    const extractedCategory = parts[1] || 'Uncategorized';
+    const extractedSubcategory = parts.length > 2 ? parts.slice(2).join(' / ') : '';
+
+    // Validate category against taxonomy — if invalid, fall back to AI classification
+    if (VALID_CATEGORIES.includes(extractedCategory)) {
+      category = extractedCategory;
+      subcategory = extractedSubcategory;
+      console.log(`Bookmark already organized: ${node.url} → ${category} / ${subcategory}`);
+    } else {
+      console.log(`Invalid category "${extractedCategory}" in Chrome folder, reclassifying: ${node.url}`);
+      isOrganized = false; // Fall through to classification
+    }
+  }
+
+  if (!isOrganized && hasRealCategory) {
+    // Keep existing real category from IndexedDB
     category = existing.category;
     subcategory = existing.subcategory || '';
   } else {
-    // Classify (fast rules + AI if needed)
+    // Need to classify — fetch metadata and use AI
+    const html = await fetchHtml(node.url);
+    const metadata = extractMetadata(html, node.url);
+    const contentType = inferContentType(metadata, node.url);
     ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
+
+    const bookmarkObj = createBookmark({
+      url: node.url,
+      title: metadata.title || node.title,
+      description: metadata.description,
+      siteName: metadata.siteName,
+      domain: metadata.domain,
+      language: metadata.language,
+      author: metadata.author,
+      keywords: metadata.keywords,
+      contentType,
+      category,
+      subcategory,
+      chromeFolder: node.chromeFolder || '',
+      dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
+    });
+    await saveBookmark(bookmarkObj);
+    return { chromeId: node.id, category, subcategory };
   }
 
+  // Save to IndexedDB (for organized or existing bookmarks — no fetch needed)
   const bookmarkObj = createBookmark({
     url: node.url,
-    title: metadata.title || node.title,
-    description: metadata.description,
-    siteName: metadata.siteName,
-    domain: metadata.domain,
-    language: metadata.language,
-    author: metadata.author,
-    keywords: metadata.keywords,
-    contentType,
+    title: node.title,
     category,
     subcategory,
     chromeFolder: node.chromeFolder || '',
     dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
   });
-
   await saveBookmark(bookmarkObj);
-  return { chromeId: node.id, category, subcategory };
+  return null; // No need to move — already in correct folder
 }
 
 /**

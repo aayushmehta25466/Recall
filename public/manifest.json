@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Recall",
   "version": "1.0.0",
-  "description": "Semantic search engine and automatic categorizer for your bookmarks.",
+  "description": "AI-powered bookmark organizer for Chrome.",
   "permissions": [
     "bookmarks",
     "storage",
@@ -27,10 +27,10 @@
   "commands": {
     "toggle-sidebar": {
       "suggested_key": {
-        "default": "Ctrl+Shift+B",
-        "mac": "Command+Shift+B"
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
       },
-      "description": "Toggle Bookmark Engine sidebar"
+      "description": "Toggle Recall sidebar"
     }
   },
   "host_permissions": [

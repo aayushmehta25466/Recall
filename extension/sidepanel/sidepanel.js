@@ -291,60 +291,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Open tabs in chunks and add to a group
-  async function openTabsInChunks(urls, chunkSize = 5) {
+  // Open tabs in a group via background script
+  function openTabsInChunks(urls) {
     if (urls.length === 0) return;
 
     // Single tab: just open directly
     if (urls.length === 1) {
-      await chrome.tabs.create({ url: urls[0], active: true });
+      chrome.tabs.create({ url: urls[0], active: true });
       return;
     }
 
-    // Multiple tabs: create group first, then add tabs in chunks
-    let groupId = null;
-
-    for (let i = 0; i < urls.length; i += chunkSize) {
-      const chunk = urls.slice(i, i + chunkSize);
-      const tabIds = [];
-
-      for (const url of chunk) {
-        const tab = await chrome.tabs.create({ url, active: false });
-        tabIds.push(tab.id);
-      }
-
-      // First chunk: create the group
-      if (groupId === null) {
-        try {
-          groupId = await chrome.tabs.group({ tabIds });
-          // Name the group
-          let groupNum = 1;
-          try {
-            const existingGroups = await chrome.tabGroups.query({});
-            const usedNums = existingGroups
-              .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
-              .filter(Boolean)
-              .map(Number);
-            while (usedNums.includes(groupNum)) groupNum++;
-          } catch {}
-          await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
-        } catch (e) {
-          console.warn('Tab grouping failed:', e);
-        }
-      } else {
-        // Subsequent chunks: add to existing group
-        try {
-          await chrome.tabs.group({ groupId, tabIds });
-        } catch (e) {
-          console.warn('Adding tabs to group failed:', e);
-        }
-      }
-
-      // Delay between chunks
-      if (i + chunkSize < urls.length) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
+    // Multiple tabs: send to background for grouping
+    chrome.runtime.sendMessage({ type: 'OPEN_IN_TAB_GROUP', urls });
   }
 
   function openAll() {

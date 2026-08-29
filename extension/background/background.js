@@ -64,24 +64,19 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'toggle-sidebar') {
     try {
-      const settings = await getSettings();
-      if (settings.viewMode === 'sidebar') {
-        // Toggle side panel
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab) {
-          const state = await chrome.sidePanel.getPanelBehavior({ tabId: tab.id });
-          if (state.openPanelOnActionClick) {
-            await chrome.sidePanel.close();
-          } else {
-            await chrome.sidePanel.open({ tabId: tab.id });
-          }
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        const state = await chrome.sidePanel.getPanelBehavior({ tabId: tab.id });
+        if (state.openPanelOnActionClick) {
+          await chrome.sidePanel.close();
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+        } else {
+          await chrome.sidePanel.open({ tabId: tab.id });
+          await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
         }
-      } else {
-        // For popup mode, open options page
-        chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html') });
       }
     } catch (e) {
-      console.error('Failed to toggle sidebar:', e);
+      console.warn('Failed to toggle sidebar:', e);
     }
   }
 });
@@ -194,6 +189,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.type === 'GET_SYNC_STATUS') {
     sendResponse({ isSyncing });
+    return true;
+  }
+
+  if (request.type === 'OPEN_IN_TAB_GROUP') {
+    const { urls } = request;
+    (async () => {
+      const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const CHUNK_SIZE = 5;
+      let groupId = null;
+
+      for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
+        const chunk = urls.slice(i, i + CHUNK_SIZE);
+        const tabIds = [];
+
+        for (const url of chunk) {
+          const tab = await chrome.tabs.create({ url, active: false, index: currentTab.index + 1 });
+          tabIds.push(tab.id);
+        }
+
+        // First chunk: create the group
+        if (groupId === null) {
+          try {
+            let groupNum = 1;
+            try {
+              const existingGroups = await chrome.tabGroups.query({});
+              const usedNums = existingGroups
+                .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
+                .filter(Boolean)
+                .map(Number);
+              while (usedNums.includes(groupNum)) groupNum++;
+            } catch {}
+            groupId = await chrome.tabs.group({ tabIds });
+            await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
+          } catch (e) {
+            console.warn('Tab grouping failed:', e);
+          }
+        } else {
+          // Subsequent chunks: add to existing group
+          try {
+            await chrome.tabs.group({ groupId, tabIds });
+          } catch (e) {
+            console.warn('Adding tabs to group failed:', e);
+          }
+        }
+
+        // Delay between chunks to avoid memory spike
+        if (i + CHUNK_SIZE < urls.length) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
+      sendResponse({ success: true });
+    })();
     return true;
   }
 

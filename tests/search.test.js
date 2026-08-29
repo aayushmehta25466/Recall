@@ -8,12 +8,7 @@ jest.unstable_mockModule('../database/indexeddb/db.js', () => ({
 
 // Mock settings
 jest.unstable_mockModule('../shared/settings.js', () => ({
-  getSettings: jest.fn().mockResolvedValue({ semanticSearch: false, openrouterApiKey: '' }),
-}));
-
-// Mock semantic search
-jest.unstable_mockModule('../core/search-engine/semantic.js', () => ({
-  semanticSearch: jest.fn().mockResolvedValue([]),
+  getSettings: jest.fn().mockResolvedValue({ openrouterApiKey: '' }),
 }));
 
 const { getActiveBookmarks } = await import('../database/indexeddb/db.js');

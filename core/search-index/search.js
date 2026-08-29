@@ -101,98 +101,9 @@ export async function searchBookmarks(query) {
 }
 
 /**
- * Search with fuzzy matching only (no BM25).
- * Useful for typo tolerance without full-text ranking.
- */
-export async function searchFuzzy(query) {
-  const bookmarks = await getActiveBookmarks();
-
-  if (!query || query.trim() === '') {
-    return bookmarks
-      .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-  }
-
-  if (!searchIndex) {
-    await buildSearchIndex();
-  }
-
-  const q = query.trim();
-
-  // Fuzzy search with prefix matching
-  const results = searchIndex.search(q, {
-    fuzzy: 0.3,        // 30% tolerance
-    prefix: true,
-    combineWith: 'OR',
-  });
-
-  const resultMap = new Map();
-  for (const r of results) {
-    resultMap.set(r.id, r.score);
-  }
-
-  const resultUrls = results.map(r => r.id);
-  const resultBookmarks = bookmarks.filter(b => resultUrls.includes(b.url));
-
-  return resultBookmarks
-    .map(b => ({ ...b, _score: resultMap.get(b.url) || 0 }))
-    .sort((a, b) => b._score - a._score);
-}
-
-/**
- * Get search suggestions (autocomplete).
- * Returns top 5 matching titles.
- */
-export async function getSearchSuggestions(query) {
-  if (!query || query.trim().length < 2) return [];
-
-  if (!searchIndex) {
-    await buildSearchIndex();
-  }
-
-  const results = searchIndex.search(query.trim(), {
-    fuzzy: 0.2,
-    prefix: true,
-    combineWith: 'AND',
-  });
-
-  return results
-    .slice(0, 5)
-    .map(r => ({
-      url: r.id,
-      title: r.title,
-      score: r.score,
-    }));
-}
-
-/**
- * Check if index needs rebuilding.
- * Returns true if bookmarks have changed since last build.
- */
-export async function needsIndexRebuild() {
-  if (!searchIndex) return true;
-
-  const bookmarks = await getActiveBookmarks();
-  return bookmarks.length !== searchIndex.documentCount;
-}
-
-/**
  * Clear the search index.
  */
 export function clearSearchIndex() {
   searchIndex = null;
   indexVersion = 0;
-}
-
-/**
- * Get index statistics.
- */
-export function getIndexStats() {
-  if (!searchIndex) return { indexed: false, count: 0, version: 0 };
-
-  return {
-    indexed: true,
-    count: searchIndex.documentCount,
-    version: indexVersion,
-    fields: SEARCH_OPTIONS.fields,
-  };
 }

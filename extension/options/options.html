@@ -9,16 +9,25 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../popup/popup.css">
 </head>
-<body class="m-0 flex h-screen overflow-hidden bg-surface-base text-text-base font-primary">
-  <!-- Sidebar -->
-  <nav class="w-[220px] min-w-[220px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-3 p-space-3 overflow-y-auto text-text-base" aria-label="Main navigation">
-    <div class="px-space-2 mb-space-2">
-      <h1 class="text-md font-extrabold tracking-tight text-text-base flex items-center gap-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
-        Bookmark Engine
-      </h1>
-      <p class="text-xs text-text-secondary mt-space-1 ml-4">Semantic search &amp; organizer</p>
-    </div>
+<body class="m-0 min-h-screen bg-surface-base text-text-base font-primary">
+  <!-- Overlay for mobile sidebar -->
+  <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/40 z-40 md:hidden"></div>
+
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <nav id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-[260px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-3 p-space-3 overflow-y-auto text-text-base transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out" aria-label="Main navigation">
+      <div class="flex items-center justify-between px-space-2 mb-space-2">
+        <div>
+          <h1 class="text-md font-extrabold tracking-tight text-text-base flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
+            Recall
+          </h1>
+          <p class="text-xs text-text-secondary mt-space-1 ml-4">AI bookmark organizer</p>
+        </div>
+        <button id="sidebarCloseBtn" class="md:hidden p-2 rounded-sm text-text-secondary hover:text-text-base hover:bg-surface-raised transition-all cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
 
     <div>
       <div class="px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary">Main</div>
@@ -56,9 +65,17 @@
   </nav>
 
   <!-- Main Content -->
-  <main class="flex-1 overflow-y-auto h-screen">
+  <main class="flex-1 overflow-y-auto min-h-screen">
+    <!-- Mobile Header with Hamburger -->
+    <div class="md:hidden sticky top-0 z-30 bg-surface-base border-b-2 border-border-default px-4 py-3 flex items-center gap-3">
+      <button id="sidebarOpenBtn" class="p-2 rounded-sm text-text-secondary hover:text-text-base hover:bg-surface-raised transition-all cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="text-sm font-bold text-text-base">Recall</span>
+    </div>
+
     <!-- Home Panel -->
-    <div id="homePanel" class="max-w-5xl mx-auto px-6 py-5">
+    <div id="homePanel" class="max-w-5xl mx-auto px-4 sm:px-6 py-5">
       <!-- Hero -->
       <div class="mb-5">
         <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -69,13 +86,13 @@
             </div>
             <p class="text-sm text-text-muted ml-5">Smart search and auto-categorization for Chrome</p>
           </div>
-          <div class="flex gap-2 flex-shrink-0">
+          <div class="flex gap-2 flex-shrink-0 flex-wrap">
             <button id="refreshIndexBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Refresh Index</button>
             <button id="organizeAllBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-green rounded-sm bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Organize All</button>
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 mb-4">
+      <div class="flex items-center gap-2 mb-4 flex-wrap">
         <input type="text" id="searchInput" placeholder="Search bookmarks..."
           class="flex-1 min-w-0 bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-space-4 py-space-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]" autocomplete="off">
         <select id="sortSelect" class="flex-shrink-0 w-[130px] bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-3 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer">
@@ -97,13 +114,13 @@
 
       <!-- Bulk Action Bar (shows when items selected) -->
       <div id="bulkBar" class="hidden bg-surface-muted border-2 border-border-default rounded-md text-text-base shadow-clay mb-4 px-4 py-3">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+          <div class="flex items-center gap-3 flex-wrap">
             <span id="selectedCount" class="text-sm font-semibold text-text-base">0 selected</span>
             <button id="selectAllBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Select All</button>
             <button id="deselectAllBtn" class="text-xs font-semibold text-text-secondary hover:text-text-base min-h-[36px] px-space-2 cursor-pointer">Deselect</button>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <button id="bulkOpenBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-accent-green rounded-sm bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Open</button>
             <select id="bulkCategory" class="bg-surface-inset border-2 border-border-default rounded-sm text-xs text-text-base px-space-3 py-space-1 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[36px] cursor-pointer">
               <option value="">Move to Category...</option>
@@ -127,10 +144,10 @@
     </div>
 
     <!-- Trash Panel -->
-    <div id="trashPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
-      <div class="flex items-center justify-between mb-4">
+    <div id="trashPanel" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Trashed Bookmarks</h2>
-        <div class="flex gap-2 items-center">
+        <div class="flex gap-2 items-center flex-wrap">
           <span id="trashInfo" class="text-sm text-text-secondary"></span>
           <button id="restoreAllBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Restore All</button>
           <button id="emptyTrashBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-red rounded-sm bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Empty Trash</button>
@@ -141,7 +158,7 @@
     </div>
 
     <!-- Settings Panel -->
-    <div id="settingsPanel" class="hidden max-w-5xl mx-auto px-6 py-5 flex flex-col gap-4">
+    <div id="settingsPanel" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-4">
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Auto-Organize</h2>
         <label class="flex items-center gap-3 cursor-pointer mt-space-3">
@@ -199,7 +216,7 @@
             </select>
           </div>
           <div class="bg-surface-inset rounded-sm p-3 text-xs text-text-secondary">
-            <strong>Keyboard Shortcut:</strong> <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Ctrl+Shift+B</kbd> (or <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Cmd+Shift+B</kbd> on Mac)
+            <strong>Keyboard Shortcut:</strong> <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Ctrl+Shift+K</kbd> (or <kbd class="px-1.5 py-0.5 bg-surface-card border border-border-default rounded text-text-base font-mono">Cmd+Shift+K</kbd> on Mac)
           </div>
         </div>
       </section>
@@ -271,7 +288,7 @@
     </div>
 
     <!-- Data Panel -->
-    <div id="dataPanel" class="hidden max-w-5xl mx-auto px-6 py-5 flex flex-col gap-4">
+    <div id="dataPanel" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-4">
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Export</h2>
         <p class="text-sm text-text-muted mb-3 mt-space-2">Export your indexed bookmarks. Choose a format:</p>
@@ -305,7 +322,7 @@
     </div>
 
     <!-- Rules Panel -->
-    <div id="rulesPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
+    <div id="rulesPanel" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-5">
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Custom Domain Mappings</h2>
         <p class="text-sm text-text-muted mb-3 mt-space-2">Override automatic classification for specific domains. These are checked before built-in rules.</p>
@@ -320,7 +337,7 @@
     </div>
 
     <!-- Review Panel (Uncategorized) -->
-    <div id="reviewPanel" class="hidden max-w-5xl mx-auto px-6 py-5">
+    <div id="reviewPanel" class="hidden max-w-5xl mx-auto px-4 sm:px-6 py-5">
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
         <div class="flex items-center justify-between mb-3">
           <div>
@@ -346,6 +363,7 @@
       </section>
     </div>
   </main>
+  </div>
 
   <script type="module" src="./options.js"></script>
 </body>

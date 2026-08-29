@@ -50,6 +50,24 @@ function switchTab(tab) {
 }
 tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
+// ─── Sidebar Toggle (mobile) ───
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const isOpen = !sidebar.classList.contains('-translate-x-full');
+  if (isOpen) {
+    sidebar.classList.add('-translate-x-full');
+    overlay.classList.add('hidden');
+  } else {
+    sidebar.classList.remove('-translate-x-full');
+    overlay.classList.remove('hidden');
+  }
+}
+
+document.getElementById('sidebarOpenBtn')?.addEventListener('click', toggleSidebar);
+document.getElementById('sidebarCloseBtn')?.addEventListener('click', toggleSidebar);
+document.getElementById('sidebarOverlay')?.addEventListener('click', toggleSidebar);
+
 // ─── Home: Bookmarks ───
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
@@ -383,6 +401,8 @@ deselectAllBtn.addEventListener('click', () => {
 bulkMoveBtn.addEventListener('click', async () => {
   const cat = bulkCategory.value;
   if (!cat || selectedUrls.size === 0) return;
+  // Import folder manager
+  const { getTargetFolderId } = await import('../../core/folder-manager/manager.js');
   for (const url of selectedUrls) {
     const b = allBookmarks.find(x => x.url === url);
     await updateBookmark(url, { category: cat, 'manualOverrides.category': true });
@@ -392,21 +412,10 @@ bulkMoveBtn.addEventListener('click', async () => {
         const results = await chrome.bookmarks.search({ url: b.url });
         if (results.length === 0) continue;
         const chromeId = results[0].id;
-        const sub = b.subcategory || '';
-        const rootTree = await chrome.bookmarks.getTree();
-        const barNode = rootTree[0].children[0];
-        const engineRootId = (await chrome.bookmarks.getChildren(barNode.id)).find(n => n.title === 'Engine Organized' && !n.url)?.id
-          || (await chrome.bookmarks.create({ parentId: barNode.id, title: 'Engine Organized' })).id;
-        let parentId = (await chrome.bookmarks.getChildren(engineRootId)).find(n => n.title === cat && !n.url)?.id
-          || (await chrome.bookmarks.create({ parentId: engineRootId, title: cat })).id;
-        if (sub) {
-          for (const part of sub.split(' / ').map(s => s.trim()).filter(Boolean)) {
-            const children = await chrome.bookmarks.getChildren(parentId);
-            const existing = children.find(n => n.title === part && !n.url);
-            parentId = existing?.id || (await chrome.bookmarks.create({ parentId, title: part })).id;
-          }
+        const targetFolderId = await getTargetFolderId(cat, b.subcategory || '');
+        if (targetFolderId) {
+          await chrome.bookmarks.move(chromeId, { parentId: targetFolderId });
         }
-        await chrome.bookmarks.move(chromeId, { parentId });
       } catch (e) { console.warn('Chrome move failed:', e); }
     }
   }
@@ -448,35 +457,11 @@ bulkOpenBtn.addEventListener('click', async () => {
     return;
   }
 
-  // Multiple bookmarks: open in a tab group
-  const tabIds = [];
-  for (const url of urls) {
-    const tab = await chrome.tabs.create({ url, active: false });
-    tabIds.push(tab.id);
-  }
-
-  if (chrome.tabGroups && chrome.tabGroups.group) {
-    try {
-      // Find next available group number
-      let groupNum = 1;
-      try {
-        const existingGroups = await chrome.tabGroups.query({});
-        const usedNums = existingGroups
-          .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
-          .filter(Boolean)
-          .map(Number);
-        while (usedNums.includes(groupNum)) groupNum++;
-      } catch {}
-
-      const groupId = await chrome.tabs.group({ tabIds });
-      await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
-    } catch (e) {
-      console.warn('Tab grouping failed:', e);
-    }
-  }
-
-  selectedUrls.clear();
-  updateBulkBar();
+  // Multiple bookmarks: send to background for tab grouping
+  chrome.runtime.sendMessage({ type: 'OPEN_IN_TAB_GROUP', urls }, () => {
+    selectedUrls.clear();
+    updateBulkBar();
+  });
 });
 
 bulkDeleteBtn.addEventListener('click', async () => {

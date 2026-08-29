@@ -56,7 +56,7 @@ Keywords: ${(metadata.keywords || []).join(', ')}`;
         'Authorization': `Bearer ${openrouterApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'chrome-extension://recall',
-        'X-Title': 'Bookmark Engine',
+        'X-Title': 'Recall',
       },
       body: JSON.stringify({
         model: openrouterModel,

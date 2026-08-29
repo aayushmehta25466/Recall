@@ -20,7 +20,6 @@ const DEFAULT_SETTINGS = {
   // Custom rules
   customDomainMappings: {},
   // AI
-  semanticSearch: false,
   aiTagSuggest: true,
   // Import/Export
   lastExportDate: null,
