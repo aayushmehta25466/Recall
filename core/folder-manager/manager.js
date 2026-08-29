@@ -1,25 +1,32 @@
+// Cache: title → folder ID, prevents race conditions during concurrent moves
+const folderCache = new Map();
+
 /**
  * Helper to find or create a folder by title under a specific parent.
+ * Caches results to avoid duplicate creation from concurrent calls.
  */
 async function getOrCreateFolder(parentId, title) {
+  const cacheKey = `${parentId}:${title}`;
+  if (folderCache.has(cacheKey)) return folderCache.get(cacheKey);
+
   const children = await chrome.bookmarks.getChildren(parentId);
   const existing = children.find(node => node.title === title && !node.url);
-  if (existing) return existing.id;
+  if (existing) {
+    folderCache.set(cacheKey, existing.id);
+    return existing.id;
+  }
   const created = await chrome.bookmarks.create({ parentId, title });
+  folderCache.set(cacheKey, created.id);
   return created.id;
 }
 
 /**
- * Returns the Bookmarks Bar node (first root child).
- * This is where organized bookmarks should go.
+ * Returns the Bookmarks Bar node by Chrome's guaranteed ID "1".
+ * Returns null if not found (never falls back to a different node).
  */
 function getBookmarksBarNode(rootTree) {
   const root = rootTree[0];
-  // Find by ID "1" (Chrome always uses "1" for Bookmarks Bar)
-  const bar = root.children?.find(n => n.id === '1');
-  if (bar) return bar;
-  // Fallback: first child that isn't a URL
-  return root.children?.find(n => !n.url) || root.children[0];
+  return root.children?.find(n => n.id === '1') || null;
 }
 
 /**
@@ -100,4 +107,11 @@ export async function cleanupEmptyFolders() {
   } catch (e) {
     console.warn('Cleanup failed:', e);
   }
+}
+
+/**
+ * Clear the folder cache. Call between sync runs.
+ */
+export function clearFolderCache() {
+  folderCache.clear();
 }

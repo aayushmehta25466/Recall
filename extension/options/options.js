@@ -383,7 +383,7 @@ Object.values(CATEGORIES).forEach(cat => {
 function updateBulkBar() {
   const count = selectedUrls.size;
   bulkBar.classList.toggle('hidden', count === 0);
-  selectedCountEl.textContent = `${count} selected`;
+  selectedCountEl.querySelector('span').textContent = count;
 }
 
 selectAllBtn.addEventListener('click', () => {
