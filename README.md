@@ -13,7 +13,7 @@
 <h1 align="center">Recall</h1>
 
 <p align="center">
-  A Chrome extension that brings AI-powered semantic search and automatic categorization to your bookmarks.
+  A Chrome extension that automatically categorizes your bookmarks using AI and keeps them organized in Chrome folders.
 </p>
 
 ---
@@ -22,12 +22,13 @@
 
 Recall keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it into a category and subcategory using AI, and moves it into the right Chrome folder — no manual sorting needed.
 
-- **Semantic search** — find bookmarks by meaning, not just exact keywords
 - **Auto-categorization** — AI-powered classification into a structured taxonomy
+- **Full-text search** — BM25 search with fuzzy matching and typo tolerance
 - **Bulk operations** — select, tag, export, or delete multiple bookmarks at once
 - **Duplicate detection** — find and merge duplicate bookmarks
 - **Trash & restore** — soft-delete with configurable auto-purge
 - **Import/Export** — JSON, CSV, and Chrome HTML formats
+- **Tab grouping** — open multiple bookmarks in Chrome tab groups
 
 ---
 
@@ -176,14 +177,15 @@ npm test          # Run Jest tests
 
 ```
 extension/
-├── popup/          # Search UI (520×620 popup)
-├── options/        # Settings, Home tab, bulk actions
+├── popup/          # Quick search UI (520×620 popup)
+├── sidepanel/      # Side panel search with history and filters
+├── options/        # Settings, Home tab, bulk actions, trash, rules
 └── background/     # Service worker — sync, AI classification, folder moves
 
 core/
 ├── ai-classifier/  # Single + batch AI classification via OpenRouter
 ├── taxonomy/       # Category tree, domain mappings, keyword rules
-├── search-index/   # Search indexing and query matching
+├── search-index/   # BM25 full-text search with MiniSearch
 ├── folder-manager/ # Chrome bookmark folder creation + moves
 ├── sync-engine/    # Full sync + incremental classification
 └── duplicate-detector/
@@ -204,6 +206,7 @@ tests/              # Jest tests for core modules
 - Vite (bundler)
 - Tailwind CSS v4
 - IndexedDB (via `idb`)
+- MiniSearch (BM25 full-text search)
 - Jest (testing)
 - ESM modules throughout
 
@@ -230,5 +233,5 @@ git push --follow-tags
 
 This automatically:
 - Syncs the version into `manifest.json`
-- Zips the `dist/` folder as `bookmarkly-X.X.X.zip`
+- Zips the `dist/` folder as `recall-X.X.X.zip`
 - Creates a GitHub Release with install instructions

@@ -38,7 +38,7 @@ npm test          # Run Jest tests
 ### Project Structure
 
 ```
-extension/        → UI (popup, options, background service worker)
+extension/        → UI (popup, sidepanel, options, background service worker)
 core/             → Business logic (AI classifier, taxonomy, search, sync)
 database/         → IndexedDB layer
 shared/           → Types, settings, UI constants
