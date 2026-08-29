@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bookmark Engine</title>
+  <title>Recall</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -65,7 +65,7 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-1">
               <div class="w-2 h-10 bg-accent-green rounded-full flex-shrink-0 shadow-clay-btn"></div>
-              <h1 class="text-lg font-extrabold tracking-tight text-text-base leading-tight">Bookmark Engine</h1>
+              <h1 class="text-lg font-extrabold tracking-tight text-text-base leading-tight">Recall</h1>
             </div>
             <p class="text-sm text-text-muted ml-5">Smart search and auto-categorization for Chrome</p>
           </div>
@@ -104,6 +104,7 @@
             <button id="deselectAllBtn" class="text-xs font-semibold text-text-secondary hover:text-text-base min-h-[36px] px-space-2 cursor-pointer">Deselect</button>
           </div>
           <div class="flex items-center gap-2">
+            <button id="bulkOpenBtn" class="font-primary text-xs font-bold tracking-wide border-2 border-accent-green rounded-sm bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[36px] px-space-4 py-space-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2">Open</button>
             <select id="bulkCategory" class="bg-surface-inset border-2 border-border-default rounded-sm text-xs text-text-base px-space-3 py-space-1 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[36px] cursor-pointer">
               <option value="">Move to Category...</option>
             </select>
@@ -131,6 +132,7 @@
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Trashed Bookmarks</h2>
         <div class="flex gap-2 items-center">
           <span id="trashInfo" class="text-sm text-text-secondary"></span>
+          <button id="restoreAllBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Restore All</button>
           <button id="emptyTrashBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-accent-red rounded-sm bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Empty Trash</button>
         </div>
       </div>
@@ -179,7 +181,7 @@
 
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base border-t-[3px] border-t-accent-purple">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Interface</h2>
-        <p class="text-sm text-text-muted mb-3 mt-space-2">Choose how Bookmark Engine opens when you click the extension icon.</p>
+        <p class="text-sm text-text-muted mb-3 mt-space-2">Choose how Recall opens when you click the extension icon.</p>
         <div class="space-y-3">
           <div>
             <label class="block text-sm text-text-base mb-1 font-semibold">View Mode</label>
@@ -232,10 +234,6 @@
               <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
             </select>
           </div>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="semanticSearch" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
-            <span class="text-sm text-text-base font-semibold">Enable AI-powered semantic search</span>
-          </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" id="aiTagSuggest" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
             <span class="text-sm text-text-base font-semibold">Auto-suggest tags after sync</span>
@@ -313,9 +311,9 @@
         <p class="text-sm text-text-muted mb-3 mt-space-2">Override automatic classification for specific domains. These are checked before built-in rules.</p>
         <div id="rulesList" class="flex flex-col gap-2 mb-3"></div>
         <div class="flex gap-2">
-          <input type="text" id="ruleDomain" placeholder="domain.com" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] flex-1">
+          <input type="text" id="ruleDomain" placeholder="domain.com" class="flex-1 bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px]">
           <select id="ruleCategory" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] cursor-pointer"></select>
-          <input type="text" id="ruleSubcategory" placeholder="Subcategory" class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px] w-32">
+          <input type="text" id="ruleSubcategory" placeholder="Subcategory" class="w-32 bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px]">
           <button id="addRuleBtn" class="font-primary text-sm font-bold tracking-wide border-2 border-border-strong rounded-sm bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm">Add</button>
         </div>
       </section>

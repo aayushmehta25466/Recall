@@ -1,4 +1,4 @@
-# Agent Guide: Bookmark Search Engine
+# Agent Guide: Recall
 
 Chrome extension (Manifest V3) for semantic bookmark search and auto-categorization.
 

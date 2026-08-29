@@ -59,11 +59,10 @@ export async function searchBookmarks(query) {
   // Get all active bookmarks for empty query or fallback
   const bookmarks = await getActiveBookmarks();
 
-  // Empty query: return recent bookmarks
+  // Empty query: return all active bookmarks
   if (!query || query.trim() === '') {
     return bookmarks
       .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded))
-      .slice(0, 50)
       .map(b => ({ ...b, _score: 0 }));
   }
 
@@ -110,8 +109,7 @@ export async function searchFuzzy(query) {
 
   if (!query || query.trim() === '') {
     return bookmarks
-      .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded))
-      .slice(0, 50);
+      .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
   }
 
   if (!searchIndex) {

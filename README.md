@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Manifest-V3-orange" alt="Manifest V3">
 </p>
 
-<h1 align="center">Bookmarkly</h1>
+<h1 align="center">Recall</h1>
 
 <p align="center">
   A Chrome extension that brings AI-powered semantic search and automatic categorization to your bookmarks.
@@ -20,7 +20,7 @@
 
 ## What It Does
 
-Bookmarkly keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it into a category and subcategory using AI, and moves it into the right Chrome folder — no manual sorting needed.
+Recall keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it into a category and subcategory using AI, and moves it into the right Chrome folder — no manual sorting needed.
 
 - **Semantic search** — find bookmarks by meaning, not just exact keywords
 - **Auto-categorization** — AI-powered classification into a structured taxonomy
@@ -35,7 +35,7 @@ Bookmarkly keeps your bookmarks organized automatically. When you save a bookmar
 
 ### The Categorization Pipeline
 
-When a bookmark is saved (or when you click **Categorize with AI**), Bookmarkly runs this pipeline:
+When a bookmark is saved (or when you click **Categorize with AI**), Recall runs this pipeline:
 
 1. **Fast rules first** — Domain mappings and keyword scoring classify instantly if the URL is a known site (GitHub → Development / Languages & Tools / Open Source)
 2. **AI fallback** — If fast rules don't match, the bookmark is sent to OpenRouter for classification using your chosen model
@@ -105,8 +105,8 @@ Bookmarks Bar
 ### Install from Source
 
 ```bash
-git clone https://github.com/aayushmehta25466/Bookmarkly.git
-cd Bookmarkly
+git clone https://github.com/aayushmehta25466/Recall.git
+cd Recall
 npm install
 npm run build
 ```
@@ -119,12 +119,12 @@ The built extension will be in the `dist/` folder.
 2. Enable **Developer mode** (toggle in top-right)
 3. Click **Load unpacked**
 4. Select the `dist/` folder from this project
-5. Bookmarkly appears in your toolbar
+5. Recall appears in your toolbar
 
 ### Install from Release
 
-1. Go to [Releases](https://github.com/aayushmehta25466/Bookmarkly/releases)
-2. Download the latest `bookmarkly-X.X.X.zip`
+1. Go to [Releases](https://github.com/aayushmehta25466/Recall/releases)
+2. Download the latest `recall-X.X.X.zip`
 3. Unzip the file
 4. Open `chrome://extensions/` → Enable **Developer mode** → **Load unpacked** → select the unzipped folder
 
@@ -132,12 +132,12 @@ The built extension will be in the `dist/` folder.
 
 ## Connect an LLM (OpenRouter)
 
-Bookmarkly uses [OpenRouter](https://openrouter.ai/) to access AI models for categorization. You need a free API key:
+Recall uses [OpenRouter](https://openrouter.ai/) to access AI models for categorization. You need a free API key:
 
 1. Go to [openrouter.ai](https://openrouter.ai/) and sign up (free tier available)
 2. Click **Keys** in the sidebar → **Create Key**
 3. Copy the API key
-4. In Bookmarkly, click the **Settings** gear icon
+4. In Recall, click the **Settings** gear icon
 5. Paste your API key in the **OpenRouter API Key** field
 6. Pick a model (default: `Gemini 2.5 Flash Lite` — fast and free)
 

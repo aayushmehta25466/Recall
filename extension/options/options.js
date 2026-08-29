@@ -187,6 +187,9 @@ function renderBookmarkCard(b, i) {
           ${b.description ? `<p class="text-xs text-text-secondary mt-space-1 line-clamp-1">${esc(b.description)}</p>` : ''}
         </div>
         <div class="flex flex-col items-end gap-space-1 shrink-0">
+          <button class="open-btn p-1 rounded-sm text-text-secondary hover:text-accent-green hover:bg-surface-raised transition-colors" title="Open in new tab" data-url="${esc(b.url)}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </button>
           ${b.contentType ? `<span class="${BADGE_DARK} text-xs">${esc(b.contentType)}</span>` : ''}
           ${b.category && b.category !== 'Uncategorized' ? `<span class="${BADGE} text-xs">${esc(b.category)}${b.subcategory ? ' / ' + esc(b.subcategory) : ''}</span>` : ''}
           ${b.tags?.length ? `<div class="flex flex-wrap gap-space-1 mt-space-1">${b.tags.map(t => `<span class="${BADGE_DARK} text-xs">${esc(t)}</span>`).join('')}</div>` : ''}
@@ -214,11 +217,11 @@ function renderBookmarks(bookmarks) {
 }
 
 function attachBookmarkListeners() {
-  // Click to open
-  bookmarksList.querySelectorAll('[data-url]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('.delete-btn, .trash-btn, .pin-btn, .bookmark-check, .drag-handle, .folder-header')) return;
-      if (!editMode) chrome.tabs.create({ url: el.dataset.url });
+  // Open button
+  bookmarksList.querySelectorAll('.open-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chrome.tabs.create({ url: btn.dataset.url });
     });
   });
 
@@ -347,6 +350,7 @@ const selectedCountEl = document.getElementById('selectedCount');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 const bulkCategory = document.getElementById('bulkCategory');
+const bulkOpenBtn = document.getElementById('bulkOpenBtn');
 const bulkMoveBtn = document.getElementById('bulkMoveBtn');
 const bulkTagBtn = document.getElementById('bulkTagBtn');
 const bulkExportBtn = document.getElementById('bulkExportBtn');
@@ -380,7 +384,31 @@ bulkMoveBtn.addEventListener('click', async () => {
   const cat = bulkCategory.value;
   if (!cat || selectedUrls.size === 0) return;
   for (const url of selectedUrls) {
+    const b = allBookmarks.find(x => x.url === url);
     await updateBookmark(url, { category: cat, 'manualOverrides.category': true });
+    // Also move in Chrome bookmarks
+    if (b) {
+      try {
+        const results = await chrome.bookmarks.search({ url: b.url });
+        if (results.length === 0) continue;
+        const chromeId = results[0].id;
+        const sub = b.subcategory || '';
+        const rootTree = await chrome.bookmarks.getTree();
+        const barNode = rootTree[0].children[0];
+        const engineRootId = (await chrome.bookmarks.getChildren(barNode.id)).find(n => n.title === 'Engine Organized' && !n.url)?.id
+          || (await chrome.bookmarks.create({ parentId: barNode.id, title: 'Engine Organized' })).id;
+        let parentId = (await chrome.bookmarks.getChildren(engineRootId)).find(n => n.title === cat && !n.url)?.id
+          || (await chrome.bookmarks.create({ parentId: engineRootId, title: cat })).id;
+        if (sub) {
+          for (const part of sub.split(' / ').map(s => s.trim()).filter(Boolean)) {
+            const children = await chrome.bookmarks.getChildren(parentId);
+            const existing = children.find(n => n.title === part && !n.url);
+            parentId = existing?.id || (await chrome.bookmarks.create({ parentId, title: part })).id;
+          }
+        }
+        await chrome.bookmarks.move(chromeId, { parentId });
+      } catch (e) { console.warn('Chrome move failed:', e); }
+    }
   }
   selectedUrls.clear();
   updateBulkBar();
@@ -408,6 +436,49 @@ bulkExportBtn.addEventListener('click', () => {
   downloadJson(selected);
 });
 
+bulkOpenBtn.addEventListener('click', async () => {
+  if (selectedUrls.size === 0) return;
+  const urls = [...selectedUrls];
+
+  // Single bookmark: just open in a new tab
+  if (urls.length === 1) {
+    await chrome.tabs.create({ url: urls[0], active: true });
+    selectedUrls.clear();
+    updateBulkBar();
+    return;
+  }
+
+  // Multiple bookmarks: open in a tab group
+  const tabIds = [];
+  for (const url of urls) {
+    const tab = await chrome.tabs.create({ url, active: false });
+    tabIds.push(tab.id);
+  }
+
+  if (chrome.tabGroups && chrome.tabGroups.group) {
+    try {
+      // Find next available group number
+      let groupNum = 1;
+      try {
+        const existingGroups = await chrome.tabGroups.query({});
+        const usedNums = existingGroups
+          .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
+          .filter(Boolean)
+          .map(Number);
+        while (usedNums.includes(groupNum)) groupNum++;
+      } catch {}
+
+      const groupId = await chrome.tabs.group({ tabIds });
+      await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
+    } catch (e) {
+      console.warn('Tab grouping failed:', e);
+    }
+  }
+
+  selectedUrls.clear();
+  updateBulkBar();
+});
+
 bulkDeleteBtn.addEventListener('click', async () => {
   if (!confirm(`Move ${selectedUrls.size} bookmarks to trash?`)) return;
   for (const url of selectedUrls) await trashBookmark(url);
@@ -422,6 +493,7 @@ const trashList = document.getElementById('trashList');
 const trashEmpty = document.getElementById('trashEmpty');
 const trashInfo = document.getElementById('trashInfo');
 const emptyTrashBtn = document.getElementById('emptyTrashBtn');
+const restoreAllBtn = document.getElementById('restoreAllBtn');
 const trashCountEl = document.getElementById('trashCount');
 
 async function loadTrash() {
@@ -464,6 +536,18 @@ emptyTrashBtn.addEventListener('click', async () => {
   updateTrashCount();
 });
 
+restoreAllBtn.addEventListener('click', async () => {
+  const items = await getTrashedBookmarks();
+  if (items.length === 0) return;
+  if (!confirm(`Restore ${items.length} bookmark${items.length !== 1 ? 's' : ''} from trash?`)) return;
+  for (const b of items) {
+    await restoreBookmark(b.url);
+  }
+  loadTrash();
+  updateTrashCount();
+  loadBookmarks();
+});
+
 async function updateTrashCount() {
   const items = await getTrashedBookmarks();
   if (items.length > 0) {
@@ -480,7 +564,6 @@ const duplicatePolicy = document.getElementById('duplicatePolicy');
 const defaultSort = document.getElementById('defaultSort');
 const openrouterApiKey = document.getElementById('openrouterApiKey');
 const openrouterModel = document.getElementById('openrouterModel');
-const semanticSearch = document.getElementById('semanticSearch');
 const aiTagSuggest = document.getElementById('aiTagSuggest');
 const aiStatus = document.getElementById('aiStatus');
 const trashAutoPurge = document.getElementById('trashAutoPurge');
@@ -506,7 +589,6 @@ async function initSettings() {
   openrouterModel.value = [...openrouterModel.options].some(o => o.value === savedModel)
     ? savedModel
     : 'google/gemini-2.5-flash-lite';
-  semanticSearch.checked = s.semanticSearch || false;
   aiTagSuggest.checked = s.aiTagSuggest !== false;
   trashAutoPurge.value = s.trashAutoPurgeDays ?? 30;
   trashMaxSize.value = s.trashMaxSize || 500;
@@ -538,7 +620,6 @@ duplicatePolicy.addEventListener('change', () => saveSetting('duplicatePolicy', 
 defaultSort.addEventListener('change', () => { saveSetting('defaultSort', defaultSort.value); sortSelect.value = defaultSort.value; sortSelect.dispatchEvent(new Event('change')); });
 openrouterApiKey.addEventListener('change', async () => { await saveSetting('openrouterApiKey', openrouterApiKey.value.trim()); updateAiStatus(await getSettings()); });
 openrouterModel.addEventListener('change', async () => { await saveSetting('openrouterModel', openrouterModel.value); updateAiStatus(await getSettings()); });
-semanticSearch.addEventListener('change', () => saveSetting('semanticSearch', semanticSearch.checked));
 aiTagSuggest.addEventListener('change', () => saveSetting('aiTagSuggest', aiTagSuggest.checked));
 trashAutoPurge.addEventListener('change', () => saveSetting('trashAutoPurgeDays', parseInt(trashAutoPurge.value)));
 trashMaxSize.addEventListener('change', () => saveSetting('trashMaxSize', parseInt(trashMaxSize.value)));
@@ -572,9 +653,22 @@ chrome.runtime.onMessage.addListener((message) => {
     syncBar.style.width = percent + '%';
     syncPercent.textContent = percent + '%';
 
+    // Show progress bar and disable buttons if sync started elsewhere
+    if (syncProgress.classList.contains('hidden')) {
+      syncProgress.classList.remove('hidden');
+    }
+    if (!organizeAllBtn.disabled) {
+      organizeAllBtn.dataset.originalText = organizeAllBtn.textContent;
+      organizeAllBtn.disabled = true;
+    }
+    if (!refreshIndexBtn.disabled) {
+      refreshIndexBtn.dataset.originalText = refreshIndexBtn.textContent;
+      refreshIndexBtn.disabled = true;
+    }
+
     // Update hero buttons with progress
-    if (organizeAllBtn?.disabled) organizeAllBtn.textContent = 'Organizing... ' + percent + '%';
-    if (refreshIndexBtn?.disabled) refreshIndexBtn.textContent = 'Refreshing... ' + percent + '%';
+    organizeAllBtn.textContent = 'Organizing... ' + percent + '%';
+    refreshIndexBtn.textContent = 'Refreshing... ' + percent + '%';
 
     if (current < total) {
       syncStatus.textContent = `Processing ${current} of ${total}...`;
@@ -588,16 +682,10 @@ chrome.runtime.onMessage.addListener((message) => {
         runSyncBtn.disabled = false;
         runSyncBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         // Reset hero buttons
-        if (organizeAllBtn?.disabled) {
-          organizeAllBtn.textContent = organizeAllBtn.dataset.originalText || 'Organize All';
-          organizeAllBtn.disabled = false;
-          organizeAllBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-        }
-        if (refreshIndexBtn?.disabled) {
-          refreshIndexBtn.textContent = refreshIndexBtn.dataset.originalText || 'Refresh Index';
-          refreshIndexBtn.disabled = false;
-          refreshIndexBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-        }
+        organizeAllBtn.textContent = organizeAllBtn.dataset.originalText || 'Organize All';
+        organizeAllBtn.disabled = false;
+        refreshIndexBtn.textContent = refreshIndexBtn.dataset.originalText || 'Refresh Index';
+        refreshIndexBtn.disabled = false;
         loadBookmarks();
       }, 2000);
     }
@@ -630,7 +718,6 @@ function startSyncFromHero(btn, label) {
   btn.disabled = true;
   btn.dataset.originalText = btn.textContent;
   btn.textContent = label + '... 0%';
-  btn.classList.add('opacity-70', 'cursor-not-allowed');
 
   syncProgress.classList.remove('hidden');
   syncBar.style.width = '0%';
@@ -980,3 +1067,22 @@ switchTab(validTabs.includes(hash) ? hash : 'home');
 await initSettings();
 await loadBookmarks();
 updateTrashCount();
+
+// Check sync status on load — show progress bar if sync is already running
+chrome.runtime.sendMessage({ type: 'GET_SYNC_STATUS' }, (response) => {
+  if (response && response.isSyncing && organizeAllBtn) {
+    syncProgress.classList.remove('hidden');
+    syncBar.style.width = '0%';
+    syncPercent.textContent = '0%';
+    syncStatus.textContent = 'Syncing...';
+    syncUrl.textContent = '';
+    organizeAllBtn.disabled = true;
+    organizeAllBtn.dataset.originalText = organizeAllBtn.textContent;
+    organizeAllBtn.textContent = 'Organizing...';
+    if (refreshIndexBtn) {
+      refreshIndexBtn.disabled = true;
+      refreshIndexBtn.dataset.originalText = refreshIndexBtn.textContent;
+      refreshIndexBtn.textContent = 'Refreshing...';
+    }
+  }
+});

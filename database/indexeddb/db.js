@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 
-const DB_NAME = 'bookmark-engine-db';
+const DB_NAME = 'recall-db';
 const DB_VERSION = 3; // Bump version for new indexes
 const STORE_NAME = 'bookmarks';
 

@@ -30,7 +30,7 @@ async function suggestTagsForBatch(bookmarks, settings) {
       headers: {
         'Authorization': `Bearer ${settings.openrouterApiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'chrome-extension://bookmark-engine',
+        'HTTP-Referer': 'chrome-extension://recall',
         'X-Title': 'Bookmark Engine',
       },
       body: JSON.stringify({

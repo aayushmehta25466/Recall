@@ -85,7 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('closeBtn').addEventListener('click', () => {
-    chrome.sidePanel.close();
+    chrome.windows.getCurrent((win) => {
+      chrome.sidePanel.close({ windowId: win.id });
+    });
   });
 
   // Quick actions
@@ -98,10 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Organize All';
       loadStats();
     });
-  });
-
-  document.getElementById('categorizeBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#review') });
   });
 
   document.getElementById('trashBtn').addEventListener('click', () => {
@@ -121,11 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (response && response.results) {
           allResults = response.results;
           filterAndRender();
+          updateActionBar();
         }
       });
     } else {
       allResults = [];
       filterAndRender();
+      updateActionBar();
     }
   });
 
@@ -211,11 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update category filters
         const filters = ['all', ...categories].sort();
-        categoryFilters.innerHTML = filters.map(cat => `
-          <button class="category-filter ${cat === currentCategory ? 'active' : ''}" data-category="${cat}">
-            ${cat === 'all' ? 'All' : cat}
-          </button>
-        `).join('');
+        categoryFilters.innerHTML = filters.map(cat => {
+          const isActive = cat === currentCategory;
+          const activeClass = isActive ? 'bg-accent-green text-white border-accent-green' : 'bg-surface-inset text-text-secondary hover:bg-accent-green hover:text-white hover:border-accent-green';
+          return `<button class="category-filter px-2.5 py-1 text-[11px] font-semibold border border-border-default rounded-full cursor-pointer transition-all ${activeClass}" data-category="${cat}">${cat === 'all' ? 'All' : cat}</button>`;
+        }).join('');
       }
     });
   }
@@ -238,13 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
       <div class="w-px h-4 bg-border-default"></div>
-      <button id="openAllBtn" class="${btnPrimary}" title="Open all in new tabs">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-        All
-      </button>
       <button id="openSelectedBtn" class="${btnPrimary} hidden" title="Open selected in new tabs">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         <span id="openSelectedLabel">0</span>
+      </button>
+      <button id="openAllBtn" class="${btnPrimary} hidden" title="Open all in new tabs">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        All
       </button>
       <button id="trashSelectedBtn" class="${btnDanger} hidden" title="Move selected to trash">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -268,9 +268,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const countEl = document.getElementById('selectedCount');
     const openSelectedBtn = document.getElementById('openSelectedBtn');
     const openSelectedLabel = document.getElementById('openSelectedLabel');
+    const openAllBtn = document.getElementById('openAllBtn');
     const trashSelectedBtn = document.getElementById('trashSelectedBtn');
     const trashSelectedLabel = document.getElementById('trashSelectedLabel');
     const count = selectedUrls.size;
+    const hasQuery = searchInput.value.trim().length > 0;
     countEl.textContent = count;
     if (count > 0) {
       openSelectedBtn.classList.remove('hidden');
@@ -281,15 +283,78 @@ document.addEventListener('DOMContentLoaded', () => {
       openSelectedBtn.classList.add('hidden');
       trashSelectedBtn.classList.add('hidden');
     }
+    // Show "Open All" only when there's a search/filter active
+    if (hasQuery && resultsContainer.querySelectorAll('[data-url]').length > 0) {
+      openAllBtn.classList.remove('hidden');
+    } else {
+      openAllBtn.classList.add('hidden');
+    }
+  }
+
+  // Open tabs in chunks and add to a group
+  async function openTabsInChunks(urls, chunkSize = 5) {
+    if (urls.length === 0) return;
+
+    // Single tab: just open directly
+    if (urls.length === 1) {
+      await chrome.tabs.create({ url: urls[0], active: true });
+      return;
+    }
+
+    // Multiple tabs: create group first, then add tabs in chunks
+    let groupId = null;
+
+    for (let i = 0; i < urls.length; i += chunkSize) {
+      const chunk = urls.slice(i, i + chunkSize);
+      const tabIds = [];
+
+      for (const url of chunk) {
+        const tab = await chrome.tabs.create({ url, active: false });
+        tabIds.push(tab.id);
+      }
+
+      // First chunk: create the group
+      if (groupId === null) {
+        try {
+          groupId = await chrome.tabs.group({ tabIds });
+          // Name the group
+          let groupNum = 1;
+          try {
+            const existingGroups = await chrome.tabGroups.query({});
+            const usedNums = existingGroups
+              .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
+              .filter(Boolean)
+              .map(Number);
+            while (usedNums.includes(groupNum)) groupNum++;
+          } catch {}
+          await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
+        } catch (e) {
+          console.warn('Tab grouping failed:', e);
+        }
+      } else {
+        // Subsequent chunks: add to existing group
+        try {
+          await chrome.tabs.group({ groupId, tabIds });
+        } catch (e) {
+          console.warn('Adding tabs to group failed:', e);
+        }
+      }
+
+      // Delay between chunks
+      if (i + chunkSize < urls.length) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
   }
 
   function openAll() {
     const urls = [...resultsContainer.querySelectorAll('[data-url]')].map(el => el.dataset.url);
-    urls.forEach(url => chrome.tabs.create({ url }));
+    openTabsInChunks(urls);
   }
 
   function openSelected() {
-    selectedUrls.forEach(url => chrome.tabs.create({ url }));
+    const urls = [...selectedUrls];
+    openTabsInChunks(urls);
     selectedUrls.clear();
     updateActionBar();
     resultsContainer.querySelectorAll('.result-check').forEach(cb => cb.checked = false);
@@ -309,9 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         trashed++;
         const card = resultsContainer.querySelector(`[data-url="${url}"]`);
         if (card) {
-          card.style.transition = 'opacity 0.2s, transform 0.2s';
-          card.style.opacity = '0';
-          card.style.transform = 'translateX(20px)';
+          card.classList.add('opacity-0', 'translate-x-5', 'transition-all', 'duration-200');
           setTimeout(() => card.remove(), 200);
         }
         if (trashed === urls.length) {
@@ -402,9 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = btn.closest('[data-url]').dataset.url;
         chrome.runtime.sendMessage({ type: 'TRASH_BOOKMARK', url }, () => {
           const card = btn.closest('[data-url]');
-          card.style.transition = 'opacity 0.2s, transform 0.2s';
-          card.style.opacity = '0';
-          card.style.transform = 'translateX(20px)';
+          card.classList.add('opacity-0', 'translate-x-5', 'transition-all', 'duration-200');
           setTimeout(() => {
             card.remove();
             loadStats();
@@ -429,6 +490,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Load stats on startup
+  // Load stats and all bookmarks on startup
   loadStats();
+  loadAllBookmarks();
+  checkSyncStatus();
+
+  function loadAllBookmarks() {
+    chrome.runtime.sendMessage({ type: 'SEARCH', query: '' }, (response) => {
+      if (response && response.results) {
+        allResults = response.results;
+        filterAndRender();
+      }
+    });
+  }
+
+  function checkSyncStatus() {
+    chrome.runtime.sendMessage({ type: 'GET_SYNC_STATUS' }, (response) => {
+      if (response && response.isSyncing) {
+        const organizeBtn = document.getElementById('organizeBtn');
+        organizeBtn.disabled = true;
+        organizeBtn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Organizing...';
+      }
+    });
+  }
 });

@@ -120,7 +120,7 @@ async function classifyBatch(bookmarks, settings) {
         'Authorization': `Bearer ${settings.openrouterApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'chrome-extension://bookmarkly',
-        'X-Title': 'Bookmarkly',
+        'X-Title': 'Recall',
       },
       body: JSON.stringify({
         model: settings.openrouterModel || 'google/gemini-2.5-flash-lite',

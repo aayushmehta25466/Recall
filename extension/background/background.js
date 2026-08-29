@@ -6,7 +6,7 @@ import { saveBookmark, getBookmark, updateBookmark, trashBookmark, restoreBookma
 import { searchBookmarks, buildSearchIndex } from '../../core/search-index/search.js';
 import { getSettings } from '../../shared/settings.js';
 
-console.log('Bookmark Search Engine: Background worker initialized.');
+console.log('Recall: Background worker initialized.');
 
 let isSyncing = false;
 
@@ -18,6 +18,13 @@ setTimeout(() => {
     isSyncing = false;
   }
 }, 600000);
+
+// Build search index on service worker startup (not just on install)
+buildSearchIndex().then(({ count }) => {
+  console.log(`Search index built on startup: ${count} bookmarks`);
+}).catch(e => {
+  console.error('Failed to build search index on startup:', e);
+});
 
 // Auto-run bulk sync on first install
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -182,6 +189,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.error('Search failed:', e);
       sendResponse({ results: [] });
     });
+    return true;
+  }
+
+  if (request.type === 'GET_SYNC_STATUS') {
+    sendResponse({ isSyncing });
     return true;
   }
 

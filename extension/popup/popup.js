@@ -71,6 +71,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Check sync status on load
+  chrome.runtime.sendMessage({ type: 'GET_SYNC_STATUS' }, (response) => {
+    if (response && response.isSyncing) {
+      const btn = document.getElementById('organizeBtn');
+      btn.classList.add('animate-spin');
+      btn.disabled = true;
+    }
+  });
+
   searchInput.addEventListener('input', async (e) => {
     const query = e.target.value.trim();
     selectedUrls.clear();

@@ -1,15 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Bookmark Search Engine",
+  "name": "Recall",
   "version": "1.0.0",
   "description": "Semantic search engine and automatic categorizer for your bookmarks.",
   "permissions": [
     "bookmarks",
     "storage",
     "tabs",
+    "tabGroups",
     "activeTab",
     "scripting",
-    "sidePanel"
+    "sidePanel",
+    "windows"
   ],
   "background": {
     "service_worker": "background.js",

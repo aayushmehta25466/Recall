@@ -6,7 +6,7 @@
 
 ---
 
-# Contributing to Bookmarkly
+# Contributing to Recall
 
 Thanks for your interest in contributing! Here's how to get started.
 
@@ -15,8 +15,8 @@ Thanks for your interest in contributing! Here's how to get started.
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/your-username/Bookmarkly.git
-   cd Bookmarkly
+   git clone https://github.com/your-username/Recall.git
+   cd Recall
    ```
 3. Install dependencies:
    ```bash
