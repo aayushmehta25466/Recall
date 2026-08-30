@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai",
+  "mcp": {
+    "extension-dev": {
+      "enabled": true,
+      "type": "local",
+      "command": ["npx", "@extension.dev/mcp"]
+    }
+  }
+}

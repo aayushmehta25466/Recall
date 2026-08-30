@@ -14,7 +14,7 @@
     "windows"
   ],
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "extension/background/background.js",
     "type": "module"
   },
   "action": {

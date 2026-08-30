@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "extension dev",
+    "build": "extension build",
+    "build:chrome": "extension build --browser=chrome",
+    "build:firefox": "extension build --browser=firefox",
+    "build:edge": "extension build --browser=edge",
     "preview": "vite preview",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "dev:vite": "vite",
+    "build:vite": "vite build"
   },
   "jest": {
     "setupFiles": [
@@ -20,6 +25,7 @@
     "@jest/globals": "^30.4.1",
     "babel-jest": "^30.4.1",
     "crx": "^5.0.1",
+    "extension": "^4.1.10",
     "jest": "^30.4.2",
     "jsdom": "^29.1.1",
     "vite": "^8.2.0"
