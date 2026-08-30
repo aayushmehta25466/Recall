@@ -163,14 +163,29 @@ async function mergeInNode(parentNode) {
     const duplicate = engineFolders[i];
     console.log(`Merging duplicate folder id=${duplicate.id} into id=${target.id}`);
 
-    // Recursively move all descendants
+    // Recursively move all descendants by URL lookup
     async function moveAllChildren(fromId, toId) {
-      const kids = await chrome.bookmarks.getChildren(fromId);
+      // Fresh lookup each time — IDs can change
+      let kids;
+      try {
+        kids = await chrome.bookmarks.getChildren(fromId);
+      } catch {
+        return; // Folder already gone
+      }
       for (const kid of kids) {
         try {
-          await chrome.bookmarks.move(kid.id, { parentId: toId });
+          if (kid.url) {
+            // Bookmark: search by URL and move
+            const found = await chrome.bookmarks.search({ url: kid.url });
+            if (found.length) {
+              await chrome.bookmarks.move(found[0].id, { parentId: toId });
+            }
+          } else {
+            // Subfolder: move by ID, then recurse
+            await chrome.bookmarks.move(kid.id, { parentId: toId });
+          }
         } catch (e) {
-          console.warn('Failed to move child during merge:', kid.title, e);
+          console.warn('Failed to move child during merge:', kid.title, e.message);
         }
       }
     }
@@ -179,10 +194,15 @@ async function mergeInNode(parentNode) {
 
     // Delete the now-empty duplicate
     try {
-      await chrome.bookmarks.removeTree(duplicate.id);
-      console.log(`Removed duplicate folder id=${duplicate.id}`);
+      const remaining = await chrome.bookmarks.getChildren(duplicate.id);
+      if (remaining.length === 0) {
+        await chrome.bookmarks.removeTree(duplicate.id);
+        console.log(`Removed duplicate folder id=${duplicate.id}`);
+      } else {
+        console.warn(`Duplicate folder not empty after merge, skipping delete: ${remaining.length} items left`);
+      }
     } catch (e) {
-      console.warn('Failed to remove duplicate folder:', e);
+      console.warn('Failed to remove duplicate folder:', e.message);
     }
   }
 
@@ -193,15 +213,24 @@ async function mergeInNode(parentNode) {
 }
 
 async function cleanupEmptySubfolders(folderId) {
-  const children = await chrome.bookmarks.getChildren(folderId);
+  let children;
+  try {
+    children = await chrome.bookmarks.getChildren(folderId);
+  } catch {
+    return;
+  }
   for (const child of children) {
     if (child.url) continue; // Skip bookmarks
     await cleanupEmptySubfolders(child.id); // Recurse first
     // Check if empty after recursing
-    const remaining = await chrome.bookmarks.getChildren(child.id);
-    if (remaining.length === 0) {
-      console.log(`Removing empty subfolder: "${child.title}" (id=${child.id})`);
-      await chrome.bookmarks.removeTree(child.id);
+    try {
+      const remaining = await chrome.bookmarks.getChildren(child.id);
+      if (remaining.length === 0) {
+        console.log(`Removing empty subfolder: "${child.title}" (id=${child.id})`);
+        await chrome.bookmarks.removeTree(child.id);
+      }
+    } catch {
+      // Folder already gone
     }
   }
 }
