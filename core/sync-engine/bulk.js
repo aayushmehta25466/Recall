@@ -5,7 +5,7 @@ import { getScoreForKeywords } from '../taxonomy/keywordRules.js';
 import { classifyWithAI } from '../ai-classifier/classifier.js';
 import { createBookmark } from '../../shared/types/bookmark.js';
 import { saveBookmark, getBookmark } from '../../database/indexeddb/db.js';
-import { moveBookmarkToCategory, cleanupEmptyFolders } from '../folder-manager/manager.js';
+import { moveBookmarkToCategory, cleanupEmptyFolders, clearFolderCache, mergeDuplicateEngineFolders } from '../folder-manager/manager.js';
 import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
 import { validateSubcategory } from '../taxonomy/categories.js';
@@ -243,6 +243,8 @@ async function mapWithLimit(items, limit, fn) {
  */
 export async function runBulkSync(moveInChrome = true) {
   console.log('Starting bulk sync...');
+  clearFolderCache();
+  await mergeDuplicateEngineFolders(); // ponytail: merge any duplicate folders first
   const settings = await getSettings();
   const tree = await chrome.bookmarks.getTree();
   const allBookmarks = flattenTree(tree);

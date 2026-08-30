@@ -7,7 +7,15 @@ const folderCache = new Map();
  */
 async function getOrCreateFolder(parentId, title) {
   const cacheKey = `${parentId}:${title}`;
-  if (folderCache.has(cacheKey)) return folderCache.get(cacheKey);
+  if (folderCache.has(cacheKey)) {
+    // Verify cached folder still exists
+    try {
+      await chrome.bookmarks.get(folderCache.get(cacheKey));
+      return folderCache.get(cacheKey);
+    } catch {
+      folderCache.delete(cacheKey); // Folder was deleted, recreate
+    }
+  }
 
   const children = await chrome.bookmarks.getChildren(parentId);
   const existing = children.find(node => node.title === title && !node.url);
@@ -106,6 +114,52 @@ export async function cleanupEmptyFolders() {
     await cleanNode(barNode.id);
   } catch (e) {
     console.warn('Cleanup failed:', e);
+  }
+}
+
+/**
+ * Merge duplicate "Engine Organized" folders under the bookmark bar.
+ * Moves all bookmarks from duplicates into the first one, then deletes the empties.
+ */
+export async function mergeDuplicateEngineFolders() {
+  try {
+    const rootTree = await chrome.bookmarks.getTree();
+    const barNode = getBookmarksBarNode(rootTree);
+    if (!barNode) return;
+
+    const children = await chrome.bookmarks.getChildren(barNode.id);
+    const engineFolders = children.filter(n => n.title === 'Engine Organized' && !n.url);
+
+    if (engineFolders.length <= 1) return;
+
+    console.log(`Found ${engineFolders.length} "Engine Organized" folders, merging...`);
+
+    // Keep the first one, move everything from the rest into it
+    const target = engineFolders[0];
+    for (let i = 1; i < engineFolders.length; i++) {
+      const duplicate = engineFolders[i];
+      const dupChildren = await chrome.bookmarks.getChildren(duplicate.id);
+
+      // Move each child (bookmark or subfolder) into the target
+      for (const child of dupChildren) {
+        try {
+          await chrome.bookmarks.move(child.id, { parentId: target.id });
+        } catch (e) {
+          console.warn('Failed to move child during merge:', child.title, e);
+        }
+      }
+
+      // Delete the now-empty duplicate
+      try {
+        await chrome.bookmarks.removeTree(duplicate.id);
+      } catch (e) {
+        console.warn('Failed to remove duplicate folder:', e);
+      }
+    }
+
+    console.log('Merged duplicate Engine Organized folders');
+  } catch (e) {
+    console.warn('mergeDuplicateEngineFolders failed:', e);
   }
 }
 
