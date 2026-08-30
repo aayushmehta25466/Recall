@@ -206,7 +206,7 @@ async function processBookmark(node, settings, processedUrls) {
       dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
     });
     await saveBookmark(bookmarkObj);
-    return { chromeId: node.id, category, subcategory };
+    return { url: node.url, category, subcategory };
   }
 
   // Save to IndexedDB (for organized or existing bookmarks — no fetch needed)
@@ -287,14 +287,15 @@ export async function runBulkSync(moveInChrome = true) {
   // Phase 2: Move bookmarks in Chrome concurrently
   if (moveInChrome && moveToQueue.length > 0) {
     console.log(`Phase 2: Moving ${moveToQueue.length} bookmarks in Chrome...`);
-    await mapWithLimit(moveToQueue, CONCURRENT_LIMIT, async ({ chromeId, category, subcategory }) => {
+    await mapWithLimit(moveToQueue, CONCURRENT_LIMIT, async ({ url, category, subcategory }) => {
       try {
-        await moveBookmarkToCategory(chromeId, category, subcategory);
+        await moveBookmarkToCategory(url, category, subcategory);
       } catch (e) {
-        console.warn('Failed to move bookmark:', chromeId, e);
+        console.warn('Failed to move bookmark:', url, e);
       }
     });
     await cleanupEmptyFolders();
+    await mergeDuplicateEngineFolders(); // cleanup again after moves
   }
 
   sendProgress(total, total, '');

@@ -67,19 +67,23 @@ export async function getTargetFolderId(category, subcategory) {
 
 /**
  * Moves a bookmark into the correct category folder.
- * Returns the source parent ID so we can delete the original after.
+ * Looks up by URL (not Chrome ID) to avoid stale ID errors.
  */
-export async function moveBookmarkToCategory(bookmarkId, category, subcategory) {
+export async function moveBookmarkToCategory(bookmarkUrl, category, subcategory) {
   try {
     const targetFolderId = await getTargetFolderId(category, subcategory);
     if (!targetFolderId) return null;
 
-    // Get the bookmark to find its current parent
-    const [bookmark] = await chrome.bookmarks.get(bookmarkId);
-    const sourceParentId = bookmark.parentId;
+    // Find bookmark by URL — Chrome IDs can go stale between sync phases
+    const results = await chrome.bookmarks.search({ url: bookmarkUrl });
+    if (!results.length) {
+      console.warn('Bookmark not found in Chrome:', bookmarkUrl);
+      return null;
+    }
 
-    await chrome.bookmarks.move(bookmarkId, { parentId: targetFolderId });
-    return sourceParentId;
+    const bookmark = results[0];
+    await chrome.bookmarks.move(bookmark.id, { parentId: targetFolderId });
+    return bookmark.parentId;
   } catch (error) {
     console.error('Failed to move bookmark:', error);
     return null;
@@ -125,41 +129,80 @@ export async function mergeDuplicateEngineFolders() {
   try {
     const rootTree = await chrome.bookmarks.getTree();
     const barNode = getBookmarksBarNode(rootTree);
-    if (!barNode) return;
 
-    const children = await chrome.bookmarks.getChildren(barNode.id);
-    const engineFolders = children.filter(n => n.title === 'Engine Organized' && !n.url);
-
-    if (engineFolders.length <= 1) return;
-
-    console.log(`Found ${engineFolders.length} "Engine Organized" folders, merging...`);
-
-    // Keep the first one, move everything from the rest into it
-    const target = engineFolders[0];
-    for (let i = 1; i < engineFolders.length; i++) {
-      const duplicate = engineFolders[i];
-      const dupChildren = await chrome.bookmarks.getChildren(duplicate.id);
-
-      // Move each child (bookmark or subfolder) into the target
-      for (const child of dupChildren) {
-        try {
-          await chrome.bookmarks.move(child.id, { parentId: target.id });
-        } catch (e) {
-          console.warn('Failed to move child during merge:', child.title, e);
-        }
-      }
-
-      // Delete the now-empty duplicate
+    if (!barNode) {
+      console.error('mergeDuplicateEngineFolders: bookmark bar not found, trying ID "1" directly');
+      // Fallback: try to get node "1" directly
       try {
-        await chrome.bookmarks.removeTree(duplicate.id);
+        const [node] = await chrome.bookmarks.get('1');
+        if (!node) return;
+        await mergeInNode(node);
       } catch (e) {
-        console.warn('Failed to remove duplicate folder:', e);
+        console.error('mergeDuplicateEngineFolders: could not get node "1":', e);
+      }
+      return;
+    }
+
+    await mergeInNode(barNode);
+  } catch (e) {
+    console.warn('mergeDuplicateEngineFolders failed:', e);
+  }
+}
+
+async function mergeInNode(parentNode) {
+  const children = await chrome.bookmarks.getChildren(parentNode.id);
+  const engineFolders = children.filter(n => n.title === 'Engine Organized' && !n.url);
+
+  console.log(`mergeInNode: found ${engineFolders.length} "Engine Organized" folders under "${parentNode.title}" (id=${parentNode.id})`);
+
+  if (engineFolders.length <= 1) return;
+
+  // Keep the first one, move everything from the rest into it
+  const target = engineFolders[0];
+  for (let i = 1; i < engineFolders.length; i++) {
+    const duplicate = engineFolders[i];
+    console.log(`Merging duplicate folder id=${duplicate.id} into id=${target.id}`);
+
+    // Recursively move all descendants
+    async function moveAllChildren(fromId, toId) {
+      const kids = await chrome.bookmarks.getChildren(fromId);
+      for (const kid of kids) {
+        try {
+          await chrome.bookmarks.move(kid.id, { parentId: toId });
+        } catch (e) {
+          console.warn('Failed to move child during merge:', kid.title, e);
+        }
       }
     }
 
-    console.log('Merged duplicate Engine Organized folders');
-  } catch (e) {
-    console.warn('mergeDuplicateEngineFolders failed:', e);
+    await moveAllChildren(duplicate.id, target.id);
+
+    // Delete the now-empty duplicate
+    try {
+      await chrome.bookmarks.removeTree(duplicate.id);
+      console.log(`Removed duplicate folder id=${duplicate.id}`);
+    } catch (e) {
+      console.warn('Failed to remove duplicate folder:', e);
+    }
+  }
+
+  // Also clean up empty subfolders inside the target
+  await cleanupEmptySubfolders(target.id);
+
+  console.log('Merged duplicate Engine Organized folders');
+}
+
+async function cleanupEmptySubfolders(folderId) {
+  const children = await chrome.bookmarks.getChildren(folderId);
+  for (const child of children) {
+    if (child.url) continue; // Skip bookmarks
+    await cleanupEmptySubfolders(child.id); // Recurse first
+    // Check if empty after recursing
+    const remaining = await chrome.bookmarks.getChildren(child.id);
+    if (remaining.length === 0) {
+      console.log(`Removing empty subfolder: "${child.title}" (id=${child.id})`);
+      await chrome.bookmarks.removeTree(child.id);
+    }
   }
 }
 

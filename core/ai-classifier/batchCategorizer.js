@@ -169,10 +169,7 @@ async function classifyBatch(bookmarks, settings) {
  */
 async function moveChromeBookmark(url, category, subcategory) {
   try {
-    const matches = await chrome.bookmarks.search({ url });
-    for (const m of matches) {
-      await moveBookmarkToCategory(m.id, category, subcategory);
-    }
+    await moveBookmarkToCategory(url, category, subcategory);
     const newPath = subcategory
       ? `Engine Organized / ${category} / ${subcategory}`
       : `Engine Organized / ${category}`;
