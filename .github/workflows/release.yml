@@ -51,7 +51,7 @@ jobs:
 
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
-          echo "Building Bookmarkly version: $VERSION"
+          echo "Building Recall version: $VERSION"
 
       # ---------------------------------------------------------
       # 6. Sync manifest version
@@ -113,7 +113,7 @@ jobs:
           cd dist
 
           zip -r \
-            "../bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip" \
+            "../recall-${{ steps.version.outputs.VERSION }}-extension.zip" \
             .
 
       # ---------------------------------------------------------
@@ -125,7 +125,7 @@ jobs:
       - name: Create source ZIP
         run: |
           zip -r \
-            "bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip" \
+            "recall-${{ steps.version.outputs.VERSION }}-source.zip" \
             . \
             -x "node_modules/*" \
                "dist/*" \
@@ -140,8 +140,8 @@ jobs:
       # ---------------------------------------------------------
       - name: Verify release artifacts
         run: |
-          EXTENSION_ZIP="bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip"
-          SOURCE_ZIP="bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip"
+          EXTENSION_ZIP="recall-${{ steps.version.outputs.VERSION }}-extension.zip"
+          SOURCE_ZIP="recall-${{ steps.version.outputs.VERSION }}-source.zip"
 
           if [ ! -s "$EXTENSION_ZIP" ]; then
             echo "::error::Extension ZIP was not created."
@@ -163,7 +163,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "🚀 Bookmarkly v${{ steps.version.outputs.VERSION }}"
+          name: "🚀 Recall v${{ steps.version.outputs.VERSION }}"
           tag_name: "v${{ steps.version.outputs.VERSION }}"
 
           body: |
@@ -175,25 +175,25 @@ jobs:
 
             ## 📦 Downloads
 
-            ### Bookmarkly Extension
+            ### Recall Extension
 
             Download:
 
-            `bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip`
+            `recall-${{ steps.version.outputs.VERSION }}-extension.zip`
 
-            This ZIP contains the final production build of Bookmarkly.
+            This ZIP contains the final production build of Recall.
 
             ### Source Code
 
             Download:
 
-            `bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip`
+            `recall-${{ steps.version.outputs.VERSION }}-source.zip`
 
             This contains the project source code for developers.
 
             ---
 
-            ## 🚀 Install Bookmarkly
+            ## 🚀 Install Recall
 
             1. Download the `-extension.zip` file.
             2. Extract the ZIP file.
@@ -208,8 +208,8 @@ jobs:
             **Version:** `${{ steps.version.outputs.VERSION }}`
 
           files: |
-            bookmarkly-${{ steps.version.outputs.VERSION }}-extension.zip
-            bookmarkly-${{ steps.version.outputs.VERSION }}-source.zip
+            recall-${{ steps.version.outputs.VERSION }}-extension.zip
+            recall-${{ steps.version.outputs.VERSION }}-source.zip
 
           draft: false
           prerelease: false
