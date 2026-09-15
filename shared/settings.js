@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS = {
   customDomainMappings: {},
   // AI
   aiTagSuggest: true,
+  // Send a newly saved bookmark to OpenRouter when fast rules can't classify it
+  autoAiCategorize: false,
   // Import/Export
   lastExportDate: null,
 };

@@ -12,7 +12,7 @@ jest.unstable_mockModule('../shared/settings.js', () => ({
 }));
 
 const { getActiveBookmarks } = await import('../database/indexeddb/db.js');
-const { searchBookmarks, buildSearchIndex, clearSearchIndex } = await import('../core/search-index/search.js');
+const { searchBookmarks, buildSearchIndex, clearSearchIndex, indexBookmark, removeFromIndex } = await import('../core/search-index/search.js');
 
 const mockBookmarks = [
   {
@@ -125,6 +125,38 @@ describe('Search Engine', () => {
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]).toHaveProperty('_score');
     expect(results[0]._score).toBeGreaterThan(0);
+  });
+
+  test('indexBookmark makes a newly saved bookmark searchable', async () => {
+    const fresh = {
+      url: 'https://fresh.example/zebra',
+      title: 'Zebra Quokka Handbook',
+      description: 'A field guide.',
+      category: 'Learning',
+      subcategory: 'Content / Books',
+      keywords: ['zebra', 'quokka'],
+      tags: ['wildlife'],
+      dateAdded: '2024-06-01T00:00:00Z',
+    };
+    // Simulate the bookmark having just been saved to the DB
+    getActiveBookmarks.mockResolvedValue([...mockBookmarks, fresh]);
+
+    // Incremental add, then a repeat (must replace, not duplicate)
+    indexBookmark(fresh);
+    indexBookmark(fresh);
+
+    const results = await searchBookmarks('Zebra');
+    const hits = results.filter(b => b.url === fresh.url);
+    expect(hits).toHaveLength(1);
+  });
+
+  test('removeFromIndex drops a bookmark from search results', async () => {
+    const url = 'https://github.com/facebook/react';
+    expect((await searchBookmarks('React')).some(b => b.url === url)).toBe(true);
+
+    removeFromIndex(url);
+
+    expect((await searchBookmarks('React')).some(b => b.url === url)).toBe(false);
   });
 
   test('should rank title matches higher than description matches', async () => {

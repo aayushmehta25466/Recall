@@ -50,15 +50,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsContainer = document.getElementById('resultsContainer');
   const actionBar = document.getElementById('actionBar');
   const searchHistory = document.getElementById('searchHistory');
+  const resultsMeta = document.getElementById('resultsMeta');
+  const resultCount = document.getElementById('resultCount');
+  const selectAllLink = document.getElementById('selectAllLink');
   const selectedUrls = new Set();
+
+  selectAllLink.addEventListener('click', selectAllResults);
 
   // Navigation buttons
   document.getElementById('homeBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#home') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#home') });
   });
 
   document.getElementById('settingsBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#settings') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#settings') });
   });
 
   document.getElementById('organizeBtn').addEventListener('click', () => {
@@ -102,6 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
           Start typing to search your knowledge base...
         </div>
       `;
+      resultsMeta.classList.add('hidden');
+      resultsMeta.classList.remove('flex');
       hideActionBar();
     }
   });
@@ -157,11 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function renderActionBar(count) {
+  function renderActionBar() {
     const btn = 'flex items-center gap-1 text-xs font-bold border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast min-h-[32px] px-2 py-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
     const btnPrimary = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-border-strong');
     const btnDanger = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-accent-red');
-    actionBar.className = 'flex items-center gap-2 p-2 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base';
     actionBar.innerHTML = `
       <span id="selectedInfo" class="flex items-center gap-1 text-xs font-bold text-accent-green min-w-[28px]">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -202,12 +208,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateActionBar() {
+    const count = selectedUrls.size;
+
+    // The toolbar only exists once something is selected
+    if (!actionBar.firstChild) {
+      actionBar.className = 'hidden';
+      return;
+    }
+    actionBar.className = count > 0
+      ? 'flex items-center gap-2 p-2 flex-wrap bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base'
+      : 'hidden';
+
     const countEl = document.getElementById('selectedCount');
     const openSelectedBtn = document.getElementById('openSelectedBtn');
     const openSelectedLabel = document.getElementById('openSelectedLabel');
     const trashSelectedBtn = document.getElementById('trashSelectedBtn');
     const trashSelectedLabel = document.getElementById('trashSelectedLabel');
-    const count = selectedUrls.size;
     countEl.textContent = count;
     if (count > 0) {
       openSelectedBtn.classList.remove('hidden');
@@ -279,17 +295,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(results) {
+    // Cards are rebuilt below, so any previous selection is gone with them
+    selectedUrls.clear();
+
     if (!results || results.length === 0) {
       resultsContainer.innerHTML = `
         <div class="flex items-center justify-center h-full text-text-secondary text-sm">
           No bookmarks found.
         </div>
       `;
+      resultsMeta.classList.add('hidden');
+      resultsMeta.classList.remove('flex');
       hideActionBar();
       return;
     }
 
-    renderActionBar(results.length);
+    resultCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+    resultsMeta.classList.remove('hidden');
+    resultsMeta.classList.add('flex');
+
+    renderActionBar();
 
     resultsContainer.innerHTML = results.map(result => `
       <article class="${CARD} flex items-start gap-space-3" data-url="${result.url}">

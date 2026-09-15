@@ -25,6 +25,22 @@ const SEARCH_OPTIONS = {
 };
 
 /**
+ * Shape a stored bookmark into a MiniSearch document.
+ */
+function bookmarkToDoc(b) {
+  return {
+    id: b.url,
+    title: b.title || '',
+    url: b.url || '',
+    description: b.description || '',
+    category: b.category || '',
+    subcategory: b.subcategory || '',
+    tags: (b.tags || []).join(' '),
+    keywords: (b.keywords || []).join(' '),
+  };
+}
+
+/**
  * Build or rebuild the search index from all active bookmarks.
  * Call this once on startup and after bulk operations.
  */
@@ -34,21 +50,43 @@ export async function buildSearchIndex() {
   searchIndex = new MiniSearch(SEARCH_OPTIONS);
 
   // Add all bookmarks with full text
-  const documents = bookmarks.map(b => ({
-    id: b.url, // Use URL as unique ID
-    title: b.title || '',
-    url: b.url || '',
-    description: b.description || '',
-    category: b.category || '',
-    subcategory: b.subcategory || '',
-    tags: (b.tags || []).join(' '),
-    keywords: (b.keywords || []).join(' '),
-  }));
+  const documents = bookmarks.map(bookmarkToDoc);
 
   searchIndex.addAll(documents);
   indexVersion++;
 
   return { count: documents.length, version: indexVersion };
+}
+
+/**
+ * Add or refresh a single bookmark in the in-memory index.
+ *
+ * Without this, a bookmark saved after the last full build is in IndexedDB but
+ * missing from search results until the next rebuild. No-op when the index has
+ * not been built yet — the startup build will pick the bookmark up.
+ */
+export function indexBookmark(bookmark) {
+  if (!searchIndex || !bookmark?.url) return;
+  const doc = bookmarkToDoc(bookmark);
+  try {
+    if (searchIndex.has(doc.id)) searchIndex.discard(doc.id);
+    searchIndex.add(doc);
+  } catch (e) {
+    console.warn('Failed to index bookmark:', bookmark.url, e);
+  }
+}
+
+/**
+ * Drop a bookmark from the in-memory index (used when it is trashed/removed).
+ * MiniSearch would otherwise keep a stale document until the next full rebuild.
+ */
+export function removeFromIndex(url) {
+  if (!searchIndex || !url) return;
+  try {
+    if (searchIndex.has(url)) searchIndex.discard(url);
+  } catch (e) {
+    console.warn('Failed to unindex bookmark:', url, e);
+  }
 }
 
 /**

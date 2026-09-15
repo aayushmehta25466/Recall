@@ -32,8 +32,8 @@ dist-ssr
 .freebuff/
 
 # Extension signing keys
-bookmarkly-extension.pem
-bookmarkly-extension.pem.b64
+recall-extension.pem
+recall-extension.pem.b64
 
 # Generated extension packages
 *.crx

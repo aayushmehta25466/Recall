@@ -6,15 +6,13 @@ import { classifyWithAI } from '../ai-classifier/classifier.js';
 import { createBookmark } from '../../shared/types/bookmark.js';
 import { saveBookmark, getBookmark } from '../../database/indexeddb/db.js';
 import { moveBookmarkToCategory, cleanupEmptyFolders, clearFolderCache, mergeDuplicateEngineFolders } from '../folder-manager/manager.js';
+import { parseEngineFolderPath } from '../folder-manager/paths.js';
 import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
 import { validateSubcategory } from '../taxonomy/categories.js';
 
-import { CATEGORIES } from '../../shared/types/taxonomy.js';
-
 const SKIP_PROTOCOLS = ['chrome:', 'chrome-extension:', 'about:', 'file:', 'javascript:'];
 const SKIP_DOMAINS = ['chromewebstore.google.com', 'chrome.google.com'];
-const VALID_CATEGORIES = Object.values(CATEGORIES);
 // ponytail: 10 concurrent fetches — fast enough to not hammer servers,
 // slow enough to avoid Chrome extension fetch quotas.
 const CONCURRENT_LIMIT = 10;
@@ -30,9 +28,15 @@ function canFetch(url) {
   }
 }
 
-function flattenTree(nodes, parentPath = '', arr = []) {
+// Walk the tree into a flat list. The root container and its immediate children
+// (the bar on Chrome, "Bookmarks Toolbar" on Firefox) are the browser's own
+// chrome, not user folders — they never contribute to `chromeFolder`. This keeps
+// the stored path in the same shape getFolderPath() produces, without depending
+// on engine-specific node ids ("1" vs "toolbar_____").
+function flattenTree(nodes, parentPath = '', arr = [], depth = 0) {
   for (const node of nodes) {
-    const currentPath = (node.id && !node.url && node.title && !['0', '1', '2'].includes(node.id))
+    const contributes = !node.url && depth >= 2 && node.title;
+    const currentPath = contributes
       ? (parentPath ? `${parentPath} / ${node.title}` : node.title)
       : parentPath;
 
@@ -40,7 +44,7 @@ function flattenTree(nodes, parentPath = '', arr = []) {
       arr.push({ ...node, chromeFolder: parentPath || '' });
     }
     if (node.children) {
-      flattenTree(node.children, currentPath, arr);
+      flattenTree(node.children, currentPath, arr, depth + 1);
     }
   }
   return arr;
@@ -100,12 +104,15 @@ export function classifyFast(metadata, url, settings) {
 
 /**
  * Full classification: fast rules → AI fallback.
+ *
+ * `useAI` lets a caller keep AI opt-in (bookmark creation uses the
+ * `autoAiCategorize` setting); bulk sync leaves it on.
  */
-export async function classifyBookmark(metadata, url, settings) {
+export async function classifyBookmark(metadata, url, settings, { useAI = true } = {}) {
   const fast = classifyFast(metadata, url, settings);
   if (fast.category !== 'Uncategorized') return fast;
 
-  if (settings.openrouterApiKey) {
+  if (useAI && settings.openrouterApiKey) {
     const aiResult = await classifyWithAI({ ...metadata, url }, settings);
     if (aiResult) {
       return { category: aiResult.category, subcategory: aiResult.subcategory };
@@ -131,18 +138,26 @@ async function fetchHtml(url) {
 
 /**
  * Process a single bookmark: fetch metadata, classify, save to IndexedDB.
- * Returns { chromeId, category, subcategory } for Chrome folder move, or null.
+ * Returns { url, category, subcategory } when the bookmark still needs a native
+ * move, or null when it is already where it belongs.
+ *
+ * Order matters — it keeps expensive work off already-handled bookmarks:
+ *   1. Anything inside the engine tree is trusted from its folder path.
+ *   2. A real category already in IndexedDB is kept (moved only if never placed).
+ *   3. Only genuinely unknown bookmarks are fetched and classified (fast → AI).
  */
 async function processBookmark(node, settings, processedUrls) {
   const norm = normalizeUrl(node.url);
   if (processedUrls.has(norm)) return null;
   processedUrls.add(norm);
 
+  const chromeFolder = node.chromeFolder || '';
+
   if (!canFetch(node.url)) {
     const bookmarkObj = createBookmark({
       url: node.url,
       title: node.title,
-      chromeFolder: node.chromeFolder || '',
+      chromeFolder,
       category: 'Uncategorized',
       dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
     });
@@ -150,76 +165,67 @@ async function processBookmark(node, settings, processedUrls) {
     return null;
   }
 
-  // Check if bookmark is already in an Engine Organized folder
-  const chromeFolder = node.chromeFolder || '';
-  let isOrganized = chromeFolder.startsWith('Engine Organized');
-
-  // Preserve existing categories — but reclassify if Uncategorized
-  const existing = await getBookmark(node.url);
-  const hasRealCategory = existing && existing.category && existing.category !== 'Uncategorized';
-
-  let category, subcategory;
-
-  if (isOrganized) {
-    // Extract category/subcategory from Chrome folder path
-    // "Engine Organized / Development / Web / Frontend" → category="Development", subcategory="Web / Frontend"
-    const parts = chromeFolder.split(' / ').map(s => s.trim()).filter(Boolean);
-    // Skip "Engine Organized" (index 0), category is index 1, rest is subcategory
-    const extractedCategory = parts[1] || 'Uncategorized';
-    const extractedSubcategory = parts.length > 2 ? parts.slice(2).join(' / ') : '';
-
-    // Validate category against taxonomy — if invalid, fall back to AI classification
-    if (VALID_CATEGORIES.includes(extractedCategory)) {
-      category = extractedCategory;
-      subcategory = extractedSubcategory;
-      console.log(`Bookmark already organized: ${node.url} → ${category} / ${subcategory}`);
-    } else {
-      console.log(`Invalid category "${extractedCategory}" in Chrome folder, reclassifying: ${node.url}`);
-      isOrganized = false; // Fall through to classification
-    }
-  }
-
-  if (!isOrganized && hasRealCategory) {
-    // Keep existing real category from IndexedDB
-    category = existing.category;
-    subcategory = existing.subcategory || '';
-  } else {
-    // Need to classify — fetch metadata and use AI
-    const html = await fetchHtml(node.url);
-    const metadata = extractMetadata(html, node.url);
-    const contentType = inferContentType(metadata, node.url);
-    ({ category, subcategory } = await classifyBookmark(metadata, node.url, settings));
-
+  // 1. Already filed inside the engine tree (by a past run, or by the user):
+  //    read the category off the folder path and stop. No fetch, no AI, no move.
+  //    This is what makes install/re-run syncs idempotent.
+  const organized = parseEngineFolderPath(chromeFolder);
+  if (organized) {
+    console.log(`Bookmark already organized: ${node.url} → ${organized.category} / ${organized.subcategory}`);
     const bookmarkObj = createBookmark({
       url: node.url,
-      title: metadata.title || node.title,
-      description: metadata.description,
-      siteName: metadata.siteName,
-      domain: metadata.domain,
-      language: metadata.language,
-      author: metadata.author,
-      keywords: metadata.keywords,
-      contentType,
-      category,
-      subcategory,
-      chromeFolder: node.chromeFolder || '',
+      title: node.title,
+      category: organized.category,
+      subcategory: organized.subcategory,
+      chromeFolder,
       dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
     });
     await saveBookmark(bookmarkObj);
-    return { url: node.url, category, subcategory };
+    return null;
   }
 
-  // Save to IndexedDB (for organized or existing bookmarks — no fetch needed)
+  // 2. Already classified in IndexedDB: keep the category and never re-fetch.
+  //    Only queue a move for a bookmark that isn't in any folder yet — one the
+  //    user has placed somewhere is respected as-is rather than dragged back.
+  const existing = await getBookmark(node.url);
+  if (existing && existing.category && existing.category !== 'Uncategorized') {
+    const category = existing.category;
+    const subcategory = existing.subcategory || '';
+    const bookmarkObj = createBookmark({
+      url: node.url,
+      title: node.title,
+      category,
+      subcategory,
+      chromeFolder,
+      dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
+    });
+    await saveBookmark(bookmarkObj);
+    return chromeFolder ? null : { url: node.url, category, subcategory };
+  }
+
+  // 3. Genuinely new: fetch metadata, classify (fast rules → AI fallback), and
+  //    let phase 2 move it into the engine tree.
+  const html = await fetchHtml(node.url);
+  const metadata = extractMetadata(html, node.url);
+  const contentType = inferContentType(metadata, node.url);
+  const { category, subcategory } = await classifyBookmark(metadata, node.url, settings);
+
   const bookmarkObj = createBookmark({
     url: node.url,
-    title: node.title,
+    title: metadata.title || node.title,
+    description: metadata.description,
+    siteName: metadata.siteName,
+    domain: metadata.domain,
+    language: metadata.language,
+    author: metadata.author,
+    keywords: metadata.keywords,
+    contentType,
     category,
     subcategory,
-    chromeFolder: node.chromeFolder || '',
+    chromeFolder,
     dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
   });
   await saveBookmark(bookmarkObj);
-  return null; // No need to move — already in correct folder
+  return { url: node.url, category, subcategory };
 }
 
 /**

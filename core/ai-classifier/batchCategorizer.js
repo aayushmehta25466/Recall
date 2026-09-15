@@ -1,7 +1,7 @@
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
 import { taxonomyTree, validateSubcategory, buildTaxonomyPrompt } from '../taxonomy/categories.js';
 import { updateBookmark, getActiveBookmarks } from '../../database/indexeddb/db.js';
-import { moveBookmarkToCategory, cleanupEmptyFolders } from '../folder-manager/manager.js';
+import { moveBookmarkToCategory, cleanupEmptyFolders, getFolderPath } from '../folder-manager/manager.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const VALID_CATEGORIES = Object.values(CATEGORIES).filter(c => c !== CATEGORIES.UNCATEGORIZED);
@@ -170,10 +170,7 @@ async function classifyBatch(bookmarks, settings) {
 async function moveChromeBookmark(url, category, subcategory) {
   try {
     await moveBookmarkToCategory(url, category, subcategory);
-    const newPath = subcategory
-      ? `Engine Organized / ${category} / ${subcategory}`
-      : `Engine Organized / ${category}`;
-    await updateBookmark(url, { chromeFolder: newPath });
+    await updateBookmark(url, { chromeFolder: getFolderPath(category, subcategory) });
   } catch (e) {
     console.warn(`Chrome folder move failed for ${url}:`, e.message);
   }

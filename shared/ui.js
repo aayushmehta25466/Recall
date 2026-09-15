@@ -23,7 +23,7 @@ export const BADGE_DARK = 'inline-block text-xs font-bold px-space-3 py-space-1 
 export const BADGE_BLUE = 'inline-block text-xs font-bold px-space-3 py-space-1 rounded-xs border-2 border-accent-blue bg-surface-blue text-accent-blue select-none shadow-clay-btn';
 export const BADGE_ORANGE = 'inline-block text-xs font-bold px-space-3 py-space-1 rounded-xs border-2 border-accent-orange bg-surface-orange text-accent-orange select-none shadow-clay-btn';
 
-export const SIDEBAR = 'w-[220px] min-w-[220px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-3 p-space-3 overflow-y-auto text-text-base';
+export const SIDEBAR = 'w-[208px] min-w-[208px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-1 p-space-2 overflow-y-auto text-text-base';
 export const SIDEBAR_LABEL = 'px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary';
 export const SIDEBAR_ITEM = 'flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar';
 export const SIDEBAR_ITEM_ACTIVE = 'bg-surface-raised border-accent-green shadow-clay-sidebar';

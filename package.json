@@ -23,11 +23,13 @@
     "@babel/core": "^8.0.1",
     "@babel/preset-env": "^8.0.2",
     "@jest/globals": "^30.4.1",
+    "@tailwindcss/postcss": "^4.3.3",
     "babel-jest": "^30.4.1",
     "crx": "^5.0.1",
     "extension": "^4.1.10",
     "jest": "^30.4.2",
     "jsdom": "^29.1.1",
+    "postcss": "^8.5.26",
     "vite": "^8.2.0"
   },
   "dependencies": {

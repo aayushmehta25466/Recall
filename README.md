@@ -13,16 +13,16 @@
 <h1 align="center">Recall</h1>
 
 <p align="center">
-  A Chrome extension that automatically categorizes your bookmarks using AI and keeps them organized in Chrome folders.
+  A Chrome extension that automatically organizes your bookmarks using fast rules + AI fallback.
 </p>
 
 ---
 
 ## What It Does
 
-Recall keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it into a category and subcategory using AI, and moves it into the right Chrome folder — no manual sorting needed.
+Recall keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it using a two-phase approach (fast rules first, AI as fallback), and moves it into the right Chrome folder.
 
-- **Auto-categorization** — AI-powered classification into a structured taxonomy
+- **Smart categorization** — Fast rules (domain mappings + keywords) with AI fallback for unknown sites
 - **Full-text search** — BM25 search with fuzzy matching and typo tolerance
 - **Bulk operations** — select, tag, export, or delete multiple bookmarks at once
 - **Duplicate detection** — find and merge duplicate bookmarks
@@ -34,18 +34,40 @@ Recall keeps your bookmarks organized automatically. When you save a bookmark, i
 
 ## How It Works
 
-### The Categorization Pipeline
+### Two-Phase Categorization
 
-When a bookmark is saved (or when you click **Categorize with AI**), Recall runs this pipeline:
+Recall uses a two-phase approach to classify bookmarks efficiently:
 
-1. **Fast rules first** — Domain mappings and keyword scoring classify instantly if the URL is a known site (GitHub → Development / Languages & Tools / Open Source)
-2. **AI fallback** — If fast rules don't match, the bookmark is sent to OpenRouter for classification using your chosen model
-3. **Chrome folder move** — The physical Chrome bookmark is moved into the correct nested folder under `Engine Organized`
-4. **IndexedDB update** — The `category`, `subcategory`, `tags`, and `chromeFolder` fields are stored for fast search
+**Phase 1: Instant Rules (no AI, no network)**
+- Domain mappings (GitHub → Development, YouTube → Entertainment, etc.)
+- Keyword scoring (title + description + URL matching against taxonomy)
+- Custom user-defined rules
+
+**Phase 2: AI Fallback (only when rules fail)**
+- If Phase 1 returns "Uncategorized" → sends to OpenRouter AI
+- Only runs during bulk sync, not on every bookmark save
+- Requires OpenRouter API key (free tier available)
+
+### Bookmark Processing Flow
+
+```
+New Bookmark Created
+  └─ Fetch HTML → Extract metadata → Fast rules → Save to IndexedDB
+     (Chrome bookmark NOT moved — user organizes manually)
+
+Bulk Sync (Background)
+  For each bookmark:
+    ├─ Already in "Engine Organized" folder? → Extract category from path
+    ├─ Already in IndexedDB with category? → Keep existing
+    └─ Need classification?
+         ├─ Fetch HTML → Extract metadata
+         ├─ Fast rules → If match → Save
+         └─ If "Uncategorized" + API key → AI classification → Save → Move Chrome bookmark
+```
 
 ### The Taxonomy
 
-Categories are structured hierarchically — each category has groups, and each group has subcategories. The AI picks the full path (e.g. `"Web / Frontend"`), never inventing new labels:
+Categories are structured hierarchically — each category has groups, and each group has leaves. The system picks the full path (e.g. `"Web / Frontend"`), never inventing new labels:
 
 ```
 Development
@@ -112,14 +134,14 @@ npm install
 npm run build
 ```
 
-The built extension will be in the `dist/` folder.
+The built extension will be in the `dist/chromium/` folder.
 
 ### Load in Chrome
 
 1. Open `chrome://extensions/`
 2. Enable **Developer mode** (toggle in top-right)
 3. Click **Load unpacked**
-4. Select the `dist/` folder from this project
+4. Select the `dist/chromium/` folder from this project
 5. Recall appears in your toolbar
 
 ### Install from Release
@@ -131,9 +153,11 @@ The built extension will be in the `dist/` folder.
 
 ---
 
-## Connect an LLM (OpenRouter)
+## Connect an LLM (Optional)
 
-Recall uses [OpenRouter](https://openrouter.ai/) to access AI models for categorization. You need a free API key:
+Recall uses [OpenRouter](https://openrouter.ai/) for AI classification as a fallback when fast rules can't categorize a bookmark. **This is optional** — Recall works without an API key using domain mappings and keyword rules.
+
+### Setup
 
 1. Go to [openrouter.ai](https://openrouter.ai/) and sign up (free tier available)
 2. Click **Keys** in the sidebar → **Create Key**
@@ -142,7 +166,7 @@ Recall uses [OpenRouter](https://openrouter.ai/) to access AI models for categor
 5. Paste your API key in the **OpenRouter API Key** field
 6. Pick a model (default: `Gemini 2.5 Flash Lite` — fast and free)
 
-**Available models:**
+### Available Models
 
 | Model | Speed | Cost |
 |-------|-------|------|
@@ -156,21 +180,25 @@ Recall uses [OpenRouter](https://openrouter.ai/) to access AI models for categor
 | Llama 4 Scout | Medium | Free tier |
 | GPT-OSS 120B | Slow | Free tier |
 
-### Categorize Your Bookmarks
+### Organize Your Bookmarks
 
 1. Click the **Settings** gear → go to the **Home** tab
-2. Click **Categorize with AI** — this sends uncategorized bookmarks to the AI in batches of 15
+2. Click **Categorize with AI** — this runs bulk sync on uncategorized bookmarks
 3. Watch the progress bar as bookmarks are classified and moved into Chrome folders
 4. Once done, your bookmarks appear organized under `Engine Organized` in the Chrome sidebar
+
+**Note:** Only bookmarks that don't match fast rules (domain mappings + keywords) are sent to AI. Bookmarks matching known domains are classified instantly without API calls.
 
 ---
 
 ## Development
 
 ```bash
-npm run dev       # Vite dev server with hot reload
-npm run build     # Production build to dist/
-npm test          # Run Jest tests
+npm run dev          # Extension.js dev server (Chrome)
+npm run build        # Extension.js production build
+npm run build:chrome # Explicit Chrome build
+npm run build:firefox # Firefox build (future)
+npm test             # Run Jest tests
 ```
 
 ### Architecture
@@ -183,11 +211,12 @@ extension/
 └── background/     # Service worker — sync, AI classification, folder moves
 
 core/
-├── ai-classifier/  # Single + batch AI classification via OpenRouter
+├── ai-classifier/  # AI classification via OpenRouter (fallback only)
 ├── taxonomy/       # Category tree, domain mappings, keyword rules
 ├── search-index/   # BM25 full-text search with MiniSearch
 ├── folder-manager/ # Chrome bookmark folder creation + moves
 ├── sync-engine/    # Full sync + incremental classification
+├── metadata-extractor/ # HTML metadata extraction (OG tags, meta)
 └── duplicate-detector/
 
 database/
@@ -203,7 +232,7 @@ tests/              # Jest tests for core modules
 ### Tech Stack
 
 - Chrome Extension Manifest V3
-- Vite (bundler)
+- Extension.js (cross-browser build system)
 - Tailwind CSS v4
 - IndexedDB (via `idb`)
 - MiniSearch (BM25 full-text search)

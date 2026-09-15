@@ -50,11 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsContainer = document.getElementById('resultsContainer');
   const actionBar = document.getElementById('actionBar');
   const searchHistory = document.getElementById('searchHistory');
-  const statsBar = document.getElementById('statsBar');
   const categoryFilters = document.getElementById('categoryFilters');
+  const selectAllLink = document.getElementById('selectAllLink');
   const selectedUrls = new Set();
   let currentCategory = 'all';
   let allResults = [];
+  let knownCategories = [];
 
   // Auto-focus search input
   searchInput.focus();
@@ -77,11 +78,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Navigation buttons
   document.getElementById('homeBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#home') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#home') });
   });
 
   document.getElementById('settingsBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#settings') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#settings') });
   });
 
   document.getElementById('closeBtn').addEventListener('click', () => {
@@ -90,21 +91,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Quick actions
-  document.getElementById('organizeBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('organizeBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Organizing...';
+  // Quick actions (header icon buttons)
+  const organizeBtn = document.getElementById('organizeBtn');
+  const ORGANIZE_ICON = organizeBtn.innerHTML;
+  const SPINNER_ICON = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+
+  organizeBtn.addEventListener('click', () => {
+    organizeBtn.disabled = true;
+    organizeBtn.innerHTML = SPINNER_ICON;
     chrome.runtime.sendMessage({ type: 'START_BULK_SYNC' }, () => {
-      btn.disabled = false;
-      btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Organize All';
+      organizeBtn.disabled = false;
+      organizeBtn.innerHTML = ORGANIZE_ICON;
       loadStats();
     });
   });
 
   document.getElementById('trashBtn').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('extension/options/options.html#trash') });
+    chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#trash') });
   });
+
+  selectAllLink.addEventListener('click', selectAllResults);
 
   // Search input
   searchInput.addEventListener('input', async (e) => {
@@ -123,9 +129,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     } else {
-      allResults = [];
-      filterAndRender();
-      updateActionBar();
+      // Not typing → show the whole library instead of a blank panel
+      searchHistory.classList.add('hidden');
+      loadAllBookmarks();
     }
   });
 
@@ -183,12 +189,20 @@ document.addEventListener('DOMContentLoaded', () => {
   categoryFilters.addEventListener('click', (e) => {
     const btn = e.target.closest('.category-filter');
     if (!btn) return;
-    
-    categoryFilters.querySelectorAll('.category-filter').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
     currentCategory = btn.dataset.category;
+    renderCategoryFilters(); // repaint the active chip
     filterAndRender();
   });
+
+  // A plain wheel over the chip rail scrolls it horizontally when it overflows —
+  // Chrome otherwise only does that with Shift held. Only hijack when there is
+  // actually something to scroll, and never when the wheel is purely horizontal.
+  categoryFilters.addEventListener('wheel', (e) => {
+    if (e.deltaY === 0) return;
+    if (categoryFilters.scrollWidth <= categoryFilters.clientWidth) return;
+    e.preventDefault();
+    categoryFilters.scrollLeft += e.deltaY;
+  }, { passive: false });
 
   function filterAndRender() {
     let filtered = allResults;
@@ -196,6 +210,18 @@ document.addEventListener('DOMContentLoaded', () => {
       filtered = allResults.filter(b => b.category === currentCategory);
     }
     renderResults(filtered);
+  }
+
+  /** Repaint the chip rail from the last-known categories + active filter. */
+  function renderCategoryFilters() {
+    const filters = ['all', ...[...knownCategories].sort((a, b) => a.localeCompare(b))];
+    const chipBase = 'category-filter px-2.5 py-1 text-[11px] font-semibold border rounded-full cursor-pointer whitespace-nowrap transition-all';
+    const chipOff = 'bg-surface-inset text-text-secondary border-border-default hover:bg-accent-green hover:text-white hover:border-accent-green';
+    const chipOn = 'bg-accent-green text-white border-accent-green';
+    categoryFilters.innerHTML = filters.map(cat => {
+      const cls = cat === currentCategory ? `${chipBase} ${chipOn}` : `${chipBase} ${chipOff}`;
+      return `<button class="${cls}" data-category="${cat}">${cat === 'all' ? 'All' : cat}</button>`;
+    }).join('');
   }
 
   async function loadStats() {
@@ -209,22 +235,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('categoryCount').textContent = categories.size;
         document.getElementById('uncategorizedCount').textContent = uncategorized;
         
-        // Update category filters
-        const filters = ['all', ...categories].sort();
-        categoryFilters.innerHTML = filters.map(cat => {
-          const isActive = cat === currentCategory;
-          const activeClass = isActive ? 'bg-accent-green text-white border-accent-green' : 'bg-surface-inset text-text-secondary hover:bg-accent-green hover:text-white hover:border-accent-green';
-          return `<button class="category-filter px-2.5 py-1 text-[11px] font-semibold border border-border-default rounded-full cursor-pointer transition-all ${activeClass}" data-category="${cat}">${cat === 'all' ? 'All' : cat}</button>`;
-        }).join('');
+        knownCategories = [...categories];
+        renderCategoryFilters();
       }
     });
   }
 
-  function renderActionBar(count) {
+  const ACTION_BAR_CLASS = 'flex items-center gap-2 p-2 flex-wrap bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base mb-2';
+
+  function renderActionBar() {
     const btn = 'flex items-center gap-1 text-xs font-bold border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast min-h-[32px] px-2 py-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
     const btnPrimary = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-border-strong');
     const btnDanger = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-accent-red');
-    actionBar.className = 'flex items-center gap-2 p-2 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base mb-3';
     actionBar.innerHTML = `
       <span id="selectedInfo" class="flex items-center gap-1 text-xs font-bold text-accent-green min-w-[28px]">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -265,14 +287,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateActionBar() {
+    const count = selectedUrls.size;
+
+    // The toolbar only exists once something is selected
+    if (!actionBar.firstChild) {
+      actionBar.className = 'hidden';
+      return;
+    }
+    actionBar.className = count > 0 ? ACTION_BAR_CLASS : 'hidden';
+
     const countEl = document.getElementById('selectedCount');
     const openSelectedBtn = document.getElementById('openSelectedBtn');
     const openSelectedLabel = document.getElementById('openSelectedLabel');
     const openAllBtn = document.getElementById('openAllBtn');
     const trashSelectedBtn = document.getElementById('trashSelectedBtn');
     const trashSelectedLabel = document.getElementById('trashSelectedLabel');
-    const count = selectedUrls.size;
     const hasQuery = searchInput.value.trim().length > 0;
+
     countEl.textContent = count;
     if (count > 0) {
       openSelectedBtn.classList.remove('hidden');
@@ -283,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
       openSelectedBtn.classList.add('hidden');
       trashSelectedBtn.classList.add('hidden');
     }
-    // Show "Open All" only when there's a search/filter active
+    // "Open all" only when there's a search/filter active
     if (hasQuery && resultsContainer.querySelectorAll('[data-url]').length > 0) {
       openAllBtn.classList.remove('hidden');
     } else {
@@ -330,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     urls.forEach(url => {
       chrome.runtime.sendMessage({ type: 'TRASH_BOOKMARK', url }, () => {
         trashed++;
+        allResults = allResults.filter(b => b.url !== url);
         const card = resultsContainer.querySelector(`[data-url="${url}"]`);
         if (card) {
           card.classList.add('opacity-0', 'translate-x-5', 'transition-all', 'duration-200');
@@ -363,17 +395,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(results) {
+    // Cards are rebuilt below, so any previous selection is gone with them
+    selectedUrls.clear();
+
     if (!results || results.length === 0) {
       resultsContainer.innerHTML = `
         <div class="flex items-center justify-center h-full text-text-secondary text-sm">
-          ${allResults.length === 0 ? 'Start typing to search your knowledge base...' : 'No bookmarks found in this category.'}
+          ${allResults.length === 0 ? 'No bookmarks indexed yet — run "Organize All".' : 'No bookmarks found in this category.'}
         </div>
       `;
       hideActionBar();
       return;
     }
 
-    renderActionBar(results.length);
+    renderActionBar();
 
     resultsContainer.innerHTML = results.map(result => `
       <article class="${CARD} flex items-start gap-3" data-url="${result.url}">
@@ -422,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         const url = btn.closest('[data-url]').dataset.url;
         chrome.runtime.sendMessage({ type: 'TRASH_BOOKMARK', url }, () => {
+          allResults = allResults.filter(b => b.url !== url);
           const card = btn.closest('[data-url]');
           card.classList.add('opacity-0', 'translate-x-5', 'transition-all', 'duration-200');
           setTimeout(() => {
@@ -459,15 +495,15 @@ document.addEventListener('DOMContentLoaded', () => {
         allResults = response.results;
         filterAndRender();
       }
+      updateActionBar();
     });
   }
 
   function checkSyncStatus() {
     chrome.runtime.sendMessage({ type: 'GET_SYNC_STATUS' }, (response) => {
       if (response && response.isSyncing) {
-        const organizeBtn = document.getElementById('organizeBtn');
         organizeBtn.disabled = true;
-        organizeBtn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Organizing...';
+        organizeBtn.innerHTML = SPINNER_ICON;
       }
     });
   }

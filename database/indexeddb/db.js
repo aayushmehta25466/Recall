@@ -1,33 +1,76 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'recall-db';
-const DB_VERSION = 3; // Bump version for new indexes
+const DB_VERSION = 4; // v4 backfills isTrashed on legacy records
 const STORE_NAME = 'bookmarks';
 
 let dbPromise = null;
 
+/**
+ * Backfill the trash fields on a record written before they existed.
+ * Returns an updated copy, or null when nothing needs changing.
+ *
+ * Records with no `isTrashed` match neither the 0 nor the 1 index entry, so they
+ * were invisible to Home, search, the compound-category query, and reconciliation.
+ */
+export function normalizeTrashFields(record) {
+  if (!record || record.isTrashed !== undefined) return null;
+  return { ...record, isTrashed: 0, trashedAt: record.trashedAt ?? null };
+}
+
 export async function initDB() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, tx) {
-        let store;
+      async upgrade(db, oldVersion, newVersion, tx) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           // Fresh install — create store with all indexes
-          store = db.createObjectStore(STORE_NAME, { keyPath: 'url' });
+          const store = db.createObjectStore(STORE_NAME, { keyPath: 'url' });
           store.createIndex('category', 'category');
           store.createIndex('dateAdded', 'dateAdded');
           store.createIndex('isTrashed', 'isTrashed');
           store.createIndex('sortOrder', 'sortOrder');
           // Compound index for the most common query: active bookmarks by category
           store.createIndex('category_isTrashed', ['category', 'isTrashed']);
-        } else if (oldVersion < 3) {
-          // v2 → v3: add compound index if missing
-          store = tx.objectStore(STORE_NAME);
-          if (!store.indexNames.contains('category_isTrashed')) {
-            store.createIndex('category_isTrashed', ['category', 'isTrashed']);
+          return;
+        }
+
+        const store = tx.objectStore(STORE_NAME);
+
+        // v2 → v3: add the compound index if missing
+        if (oldVersion < 3 && !store.indexNames.contains('category_isTrashed')) {
+          store.createIndex('category_isTrashed', ['category', 'isTrashed']);
+        }
+
+        // v3 → v4: backfill isTrashed on legacy records
+        if (oldVersion < 4) {
+          let cursor = await store.openCursor();
+          while (cursor) {
+            const normalized = normalizeTrashFields(cursor.value);
+            if (normalized) await cursor.update(normalized);
+            cursor = await cursor.continue();
           }
         }
       },
+      blocked() {
+        console.warn(
+          'Recall: IndexedDB upgrade blocked — another tab/worker (often an older ' +
+          'copy of the extension) is still holding "recall-db" open. Close other ' +
+          'extension pages, or remove the duplicate extension, then reload.'
+        );
+      },
+    }).catch((err) => {
+      // IndexedDB refuses to downgrade. If "recall-db" was written by a NEWER build
+      // than this one (e.g. an older build, or a duplicate install, is loaded), the
+      // open fails with VersionError. Open the existing database as-is so search and
+      // sync keep working instead of the worker failing to boot.
+      if (err && err.name === 'VersionError') {
+        console.warn(
+          `Recall: "recall-db" is at a newer version than this build expects (${DB_VERSION}). ` +
+          'Opening it read/write as-is — reload/update the extension to the matching build.'
+        );
+        return openDB(DB_NAME);
+      }
+      throw err;
     });
   }
   return dbPromise;
@@ -65,16 +108,12 @@ export async function updateBookmark(url, fields) {
 
 /**
  * Get all non-trashed bookmarks using the isTrashed index.
- * Avoids loading trashed bookmarks into memory.
+ * Legacy records are normalized to `isTrashed: 0` by the v4 migration, so the
+ * index is complete.
  */
 export async function getActiveBookmarks() {
   const db = await initDB();
-  const all = await db.getAllFromIndex(STORE_NAME, 'isTrashed', 0);
-  // Index returns 0 for non-trashed, but we also need to handle
-  // bookmarks where isTrashed is undefined (legacy records)
-  const trashed = await db.getAllFromIndex(STORE_NAME, 'isTrashed', 1);
-  const trashedUrls = new Set(trashed.map(b => b.url));
-  return all.filter(b => !trashedUrls.has(b.url));
+  return db.getAllFromIndex(STORE_NAME, 'isTrashed', 0);
 }
 
 /**

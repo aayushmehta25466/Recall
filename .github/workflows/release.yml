@@ -18,6 +18,9 @@ jobs:
       # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history so the changelog can diff against the previous tag
+          fetch-depth: 0
 
       # ---------------------------------------------------------
       # 2. Setup Node.js
@@ -61,7 +64,7 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
 
-          const manifestPath = 'dist/manifest.json';
+          const manifestPath = 'dist/chromium/manifest.json';
           const version = process.env.VERSION;
 
           if (!fs.existsSync(manifestPath)) {
@@ -90,30 +93,36 @@ jobs:
       # ---------------------------------------------------------
       - name: Verify extension build
         run: |
-          if [ ! -f "dist/manifest.json" ]; then
-            echo "::error::dist/manifest.json does not exist."
+          MANIFEST="dist/chromium/manifest.json"
+
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::$MANIFEST does not exist."
             exit 1
           fi
 
           echo "Final extension contents:"
-          find dist -maxdepth 3 -type f | sort
+          find dist/chromium -maxdepth 3 -type f | sort
 
           echo ""
           echo "Manifest:"
-          cat dist/manifest.json
+          cat "$MANIFEST"
 
       # ---------------------------------------------------------
       # 8. Create final extension ZIP
       #
       # IMPORTANT:
-      # This ZIP contains ONLY the built dist/ contents.
+      # This ZIP contains ONLY the built extension, with manifest.json
+      # at its root (as the Chrome Web Store expects).
       # ---------------------------------------------------------
       - name: Create extension ZIP
         run: |
-          cd dist
+          cd dist/chromium
+
+          # Drop the zip produced by the build so it isn't nested inside itself
+          rm -f recall-chrome.zip
 
           zip -r \
-            "../recall-${{ steps.version.outputs.VERSION }}-extension.zip" \
+            "../../recall-${{ steps.version.outputs.VERSION }}-extension.zip" \
             .
 
       # ---------------------------------------------------------
@@ -158,7 +167,26 @@ jobs:
           ls -lh "$SOURCE_ZIP"
 
       # ---------------------------------------------------------
-      # 11. Create GitHub Release
+      # 11. Generate changelog
+      # ---------------------------------------------------------
+      - name: Get changelog from commits
+        id: changelog
+        shell: bash
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+          fi
+
+          echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------
+      # 12. Create GitHub Release
       # ---------------------------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -213,22 +241,3 @@ jobs:
 
           draft: false
           prerelease: false
-
-      # ---------------------------------------------------------
-      # 12. Generate changelog
-      # ---------------------------------------------------------
-      - name: Get changelog from commits
-        id: changelog
-        shell: bash
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
-          fi
-
-          echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$COMMITS" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"

@@ -1,7 +1,15 @@
-import { getAllBookmarks, getActiveBookmarks, getTrashedBookmarks, updateBookmark, trashBookmark, restoreBookmark, emptyTrash, clearAllBookmarks, saveBookmarks, initDB } from '../../database/indexeddb/db.js';
+import { getAllBookmarks, getActiveBookmarks, getTrashedBookmarks, updateBookmark, clearAllBookmarks, saveBookmarks, initDB } from '../../database/indexeddb/db.js';
 import { getSettings, saveSettings } from '../../shared/settings.js';
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
 import { BTN, BTN_SECONDARY, BTN_DANGER, CARD, BADGE, BADGE_DARK } from '../../shared/ui.js';
+
+// Trash/restore go through the background worker so the Chrome bookmark and the
+// in-memory search index stay in step with IndexedDB (which the worker owns).
+function sendMessage(message) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(message, (response) => resolve(response));
+  });
+}
 
 // Theme detection (replaces inline script for CSP compliance)
 chrome.storage.sync.get('settings', (data) => {
@@ -272,7 +280,7 @@ function attachBookmarkListeners() {
       e.stopPropagation();
       const url = btn.dataset.url;
       if (!confirm('Move this bookmark to trash?')) return;
-      await trashBookmark(url);
+      await sendMessage({ type: 'TRASH_BOOKMARK', url });
       loadBookmarks();
       updateTrashCount();
     });
@@ -466,7 +474,7 @@ bulkOpenBtn.addEventListener('click', async () => {
 
 bulkDeleteBtn.addEventListener('click', async () => {
   if (!confirm(`Move ${selectedUrls.size} bookmarks to trash?`)) return;
-  for (const url of selectedUrls) await trashBookmark(url);
+  for (const url of selectedUrls) await sendMessage({ type: 'TRASH_BOOKMARK', url });
   selectedUrls.clear();
   updateBulkBar();
   loadBookmarks();
@@ -500,9 +508,10 @@ async function loadTrash() {
 
   trashList.querySelectorAll('.restore-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      await restoreBookmark(btn.dataset.url);
+      await sendMessage({ type: 'RESTORE_BOOKMARK', url: btn.dataset.url });
       loadTrash();
       updateTrashCount();
+      loadBookmarks();
     });
   });
 }
@@ -510,7 +519,7 @@ async function loadTrash() {
 emptyTrashBtn.addEventListener('click', async () => {
   const items = await getTrashedBookmarks();
   if (!confirm(`Permanently delete ${items.length} bookmarks? This cannot be undone.`)) return;
-  const count = await emptyTrash();
+  await sendMessage({ type: 'EMPTY_TRASH' });
   for (const b of items) {
     try {
       const results = await chrome.bookmarks.search({ url: b.url });
@@ -526,7 +535,7 @@ restoreAllBtn.addEventListener('click', async () => {
   if (items.length === 0) return;
   if (!confirm(`Restore ${items.length} bookmark${items.length !== 1 ? 's' : ''} from trash?`)) return;
   for (const b of items) {
-    await restoreBookmark(b.url);
+    await sendMessage({ type: 'RESTORE_BOOKMARK', url: b.url });
   }
   loadTrash();
   updateTrashCount();
@@ -550,6 +559,7 @@ const defaultSort = document.getElementById('defaultSort');
 const openrouterApiKey = document.getElementById('openrouterApiKey');
 const openrouterModel = document.getElementById('openrouterModel');
 const aiTagSuggest = document.getElementById('aiTagSuggest');
+const autoAiCategorize = document.getElementById('autoAiCategorize');
 const aiStatus = document.getElementById('aiStatus');
 const trashAutoPurge = document.getElementById('trashAutoPurge');
 const trashMaxSize = document.getElementById('trashMaxSize');
@@ -562,9 +572,15 @@ const syncPercent = document.getElementById('syncPercent');
 const syncBar = document.getElementById('syncBar');
 const syncUrl = document.getElementById('syncUrl');
 
+// Toggle switches: keep aria-checked in step with the visual state
+function syncSwitch(el, on) {
+  el.checked = on;
+  el.setAttribute('aria-checked', String(on));
+}
+
 async function initSettings() {
   const s = await getSettings();
-  autoOrganizeToggle.checked = s.autoOrganize;
+  syncSwitch(autoOrganizeToggle, s.autoOrganize);
   duplicatePolicy.value = s.duplicatePolicy;
   defaultSort.value = s.defaultSort || 'manual';
   sortSelect.value = s.defaultSort || 'manual';
@@ -574,7 +590,8 @@ async function initSettings() {
   openrouterModel.value = [...openrouterModel.options].some(o => o.value === savedModel)
     ? savedModel
     : 'google/gemini-2.5-flash-lite';
-  aiTagSuggest.checked = s.aiTagSuggest !== false;
+  syncSwitch(aiTagSuggest, s.aiTagSuggest !== false);
+  syncSwitch(autoAiCategorize, s.autoAiCategorize === true);
   trashAutoPurge.value = s.trashAutoPurgeDays ?? 30;
   trashMaxSize.value = s.trashMaxSize || 500;
   updateAiStatus(s);
@@ -596,12 +613,13 @@ async function saveSetting(key, value) {
   await saveSettings(s);
 }
 
-autoOrganizeToggle.addEventListener('change', () => saveSetting('autoOrganize', autoOrganizeToggle.checked));
+autoOrganizeToggle.addEventListener('change', () => { syncSwitch(autoOrganizeToggle, autoOrganizeToggle.checked); saveSetting('autoOrganize', autoOrganizeToggle.checked); });
 duplicatePolicy.addEventListener('change', () => saveSetting('duplicatePolicy', duplicatePolicy.value));
 defaultSort.addEventListener('change', () => { saveSetting('defaultSort', defaultSort.value); sortSelect.value = defaultSort.value; sortSelect.dispatchEvent(new Event('change')); });
 openrouterApiKey.addEventListener('change', async () => { await saveSetting('openrouterApiKey', openrouterApiKey.value.trim()); updateAiStatus(await getSettings()); });
 openrouterModel.addEventListener('change', async () => { await saveSetting('openrouterModel', openrouterModel.value); updateAiStatus(await getSettings()); });
-aiTagSuggest.addEventListener('change', () => saveSetting('aiTagSuggest', aiTagSuggest.checked));
+aiTagSuggest.addEventListener('change', () => { syncSwitch(aiTagSuggest, aiTagSuggest.checked); saveSetting('aiTagSuggest', aiTagSuggest.checked); });
+autoAiCategorize.addEventListener('change', () => { syncSwitch(autoAiCategorize, autoAiCategorize.checked); saveSetting('autoAiCategorize', autoAiCategorize.checked); });
 trashAutoPurge.addEventListener('change', () => saveSetting('trashAutoPurgeDays', parseInt(trashAutoPurge.value)));
 trashMaxSize.addEventListener('change', () => saveSetting('trashMaxSize', parseInt(trashMaxSize.value)));
 
@@ -937,6 +955,14 @@ const batchPercent = document.getElementById('batchPercent');
 const batchBar = document.getElementById('batchBar');
 const uncatCountEl = document.getElementById('uncatCount');
 
+/** The AI batch button is only usable when there is something to categorize. */
+function setBatchButtonState(enabled) {
+  batchCategorizeBtn.disabled = !enabled;
+  batchCategorizeBtn.title = enabled
+    ? 'Classify uncategorized bookmarks with AI'
+    : 'No uncategorized bookmarks';
+}
+
 async function loadReview() {
   try {
     const { getUncategorizedBookmarks } = await import('../../core/ai-classifier/batchCategorizer.js');
@@ -947,9 +973,11 @@ async function loadReview() {
       reviewEmpty.classList.remove('hidden');
       reviewStats.textContent = '';
       uncatCountEl.classList.add('hidden');
+      setBatchButtonState(false);
       return;
     }
 
+    setBatchButtonState(true);
     reviewEmpty.classList.add('hidden');
     reviewStats.textContent = `${items.length} bookmark${items.length !== 1 ? 's' : ''} need categorization`;
     uncatCountEl.textContent = items.length;
@@ -971,10 +999,12 @@ async function loadReview() {
   } catch (e) {
     console.error('Failed to load review:', e);
     reviewList.innerHTML = '<p class="text-sm font-bold text-red-600">Failed to load uncategorized bookmarks.</p>';
+    setBatchButtonState(false);
   }
 }
 
 batchCategorizeBtn.addEventListener('click', async () => {
+  if (batchCategorizeBtn.disabled) return;
   try {
     const { runBatchCategorize } = await import('../../core/ai-classifier/batchCategorizer.js');
     const settings = await getSettings();

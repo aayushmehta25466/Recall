@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recall</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./popup.css">
 </head>
 <body class="w-[520px] h-[620px] p-space-5 m-0 overflow-hidden flex flex-col bg-surface-base text-text-base font-primary">
@@ -16,7 +13,6 @@
         <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
         Recall
       </h1>
-      <p class="text-xs text-text-secondary mt-space-1 ml-4">AI bookmark organizer</p>
     </div>
     <div class="flex items-center gap-space-1">
       <button id="homeBtn" title="Open Home" class="p-space-3 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all duration-fast cursor-pointer shadow-clay-btn hover:shadow-clay-btn-hover hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-clay-pressed">
@@ -43,7 +39,12 @@
       <div id="searchHistory" class="hidden absolute top-full left-0 right-0 mt-1 bg-surface-card border-2 border-border-default rounded-sm shadow-clay z-50 max-h-48 overflow-y-auto"></div>
     </div>
 
-    <div id="actionBar" class="hidden items-center gap-space-2 p-space-3 bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base"></div>
+    <div id="resultsMeta" class="hidden items-center justify-between text-[11px] text-text-secondary">
+      <span id="resultCount"></span>
+      <button id="selectAllLink" class="font-bold text-accent-green hover:underline cursor-pointer">Select all</button>
+    </div>
+
+    <div id="actionBar" class="hidden"></div>
 
     <div id="resultsContainer" class="flex-1 overflow-y-auto pr-space-2 flex flex-col gap-space-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-muted [&::-webkit-scrollbar-thumb]:rounded-xs">
       <div class="flex items-center justify-center h-full text-text-secondary text-sm">

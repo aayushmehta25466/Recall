@@ -4,25 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recall</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../popup/popup.css">
 </head>
 <body class="m-0 min-h-screen bg-surface-base text-text-base font-primary">
   <!-- Overlay for mobile sidebar -->
   <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/40 z-40 md:hidden"></div>
 
-  <div class="flex min-h-screen">
+  <div class="flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-[260px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-3 p-space-3 overflow-y-auto text-text-base transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out" aria-label="Main navigation">
-      <div class="flex items-center justify-between px-space-2 mb-space-2">
+    <nav id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-[208px] bg-surface-muted border-r-2 border-border-default flex flex-col gap-space-1 p-space-2 overflow-y-auto text-text-base transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out" aria-label="Main navigation">
+      <div class="flex items-center justify-between px-space-2 mb-space-1">
         <div>
           <h1 class="text-md font-extrabold tracking-tight text-text-base flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
             Recall
           </h1>
-          <p class="text-xs text-text-secondary mt-space-1 ml-4">AI bookmark organizer</p>
         </div>
         <button id="sidebarCloseBtn" class="md:hidden p-2 rounded-sm text-text-secondary hover:text-text-base hover:bg-surface-raised transition-all cursor-pointer">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -31,12 +27,12 @@
 
     <div>
       <div class="px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary">Main</div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar bg-surface-raised border-accent-green shadow-clay-sidebar" data-tab="home" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar bg-surface-raised border-accent-green shadow-clay-sidebar" data-tab="home" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
         <span>Bookmarks</span>
       </div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="trash" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="trash" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
         <span>Trash</span>
         <span id="trashCount" class="ml-auto bg-text-base text-text-on-dark text-xs px-space-2 py-space-1 rounded-xs border-2 border-border-strong font-bold hidden">0</span>
       </div>
@@ -44,20 +40,20 @@
 
     <div>
       <div class="px-space-4 py-space-1 text-xs font-bold uppercase tracking-widest text-text-secondary">Manage</div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="settings" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="settings" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         <span>Settings</span>
       </div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="data" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="data" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
         <span>Data</span>
       </div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="rules" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="rules" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
         <span>Rules</span>
       </div>
-      <div class="flex items-center gap-space-3 px-space-4 py-space-3 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[44px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="review" role="tab">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <div class="flex items-center gap-space-2 px-space-3 py-space-2 rounded-sm cursor-pointer select-none border-2 border-transparent text-sm font-semibold text-text-base transition-all duration-fast min-h-[38px] hover:bg-surface-raised hover:border-border-default hover:shadow-clay-sidebar" data-tab="review" role="tab">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         <span>Review</span>
         <span id="uncatCount" class="ml-auto bg-text-base text-text-on-dark text-xs px-space-2 py-space-1 rounded-xs border-2 border-border-strong font-bold hidden">0</span>
       </div>
@@ -65,7 +61,7 @@
   </nav>
 
   <!-- Main Content -->
-  <main class="flex-1 overflow-y-auto min-h-screen">
+  <main class="flex-1 overflow-y-auto">
     <!-- Mobile Header with Hamburger -->
     <div class="md:hidden sticky top-0 z-30 bg-surface-base border-b-2 border-border-default px-4 py-3 flex items-center gap-3">
       <button id="sidebarOpenBtn" class="p-2 rounded-sm text-text-secondary hover:text-text-base hover:bg-surface-raised transition-all cursor-pointer">
@@ -167,7 +163,8 @@
       <section class="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
         <h2 class="text-md font-extrabold tracking-tight text-text-base">Auto-Organize</h2>
         <label class="flex items-center gap-3 cursor-pointer mt-space-3">
-          <input type="checkbox" id="autoOrganizeToggle" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
+          <input type="checkbox" id="autoOrganizeToggle" role="switch" class="peer sr-only">
+          <span class="relative shrink-0 w-12 h-7 rounded-full bg-surface-inset border-2 border-border-default shadow-clay-inset transition-colors duration-fast after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:w-5 after:h-5 after:rounded-full after:bg-surface-card after:shadow-clay-btn after:transition-transform after:duration-fast peer-checked:bg-accent-green peer-checked:border-accent-green peer-checked:after:translate-x-5 peer-focus-visible:outline-[3px] peer-focus-visible:outline-solid peer-focus-visible:outline-accent-green peer-focus-visible:outline-offset-2"></span>
           <span class="text-sm text-text-base font-semibold">Enable auto-organize</span>
         </label>
       </section>
@@ -231,8 +228,15 @@
               <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
             </select>
           </div>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="aiTagSuggest" class="w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" id="autoAiCategorize" role="switch" class="peer sr-only">
+            <span class="relative shrink-0 w-12 h-7 rounded-full bg-surface-inset border-2 border-border-default shadow-clay-inset transition-colors duration-fast after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:w-5 after:h-5 after:rounded-full after:bg-surface-card after:shadow-clay-btn after:transition-transform after:duration-fast peer-checked:bg-accent-green peer-checked:border-accent-green peer-checked:after:translate-x-5 peer-focus-visible:outline-[3px] peer-focus-visible:outline-solid peer-focus-visible:outline-accent-green peer-focus-visible:outline-offset-2"></span>
+            <span class="text-sm text-text-base font-semibold">Automatically categorize with AI</span>
+          </label>
+          <p class="text-xs text-text-muted -mt-1">When fast rules can't classify a new bookmark, ask OpenRouter and file it there. Needs an API key.</p>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" id="aiTagSuggest" role="switch" class="peer sr-only">
+            <span class="relative shrink-0 w-12 h-7 rounded-full bg-surface-inset border-2 border-border-default shadow-clay-inset transition-colors duration-fast after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:w-5 after:h-5 after:rounded-full after:bg-surface-card after:shadow-clay-btn after:transition-transform after:duration-fast peer-checked:bg-accent-green peer-checked:border-accent-green peer-checked:after:translate-x-5 peer-focus-visible:outline-[3px] peer-focus-visible:outline-solid peer-focus-visible:outline-accent-green peer-focus-visible:outline-offset-2"></span>
             <span class="text-sm text-text-base font-semibold">Auto-suggest tags after sync</span>
           </label>
           <div id="aiStatus" class="text-sm text-text-secondary"></div>
