@@ -23,12 +23,15 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------------------------------
-      # 2. Setup Node.js (Extension.js requires >= 22.12)
+      # 2. Setup Node.js
+      #
+      # 24 is the active LTS and >= 24.9, which is where Jest can require()
+      # ESM without failing on vm module APIs. Extension.js needs >= 22.12.
       # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       # ---------------------------------------------------------

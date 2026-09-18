@@ -12,8 +12,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Extension.js requires >= 22.12
-          node-version: 22
+          # Extension.js needs >= 22.12; 24 is the active LTS and, importantly,
+          # >= 24.9 — the point where Jest can require() ESM without choking on
+          # vm module APIs (which is what broke the first release run).
+          node-version: 24
           cache: npm
 
       - run: npm ci
