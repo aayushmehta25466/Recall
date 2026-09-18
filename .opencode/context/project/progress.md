@@ -181,10 +181,19 @@
       (`required: ["none"]`, `optional: ["bookmarksInfo", "websiteContent"]` for the opt-in AI
       path). `strict_min_version` raised to **140.0** — tab groups need 139, but the built-in
       data-consent experience needs 140. `addons-linter` reports 0 warnings / 0 errors.
-- [ ] **Still required for a *working* Firefox build:** migrate `chrome.*` call sites to a
-      `browser ?? chrome` adapter. MDN is explicit that Firefox's `chrome` namespace is
-      callback-based, so every `await chrome.*` call returns `undefined` there. Until that
-      lands, `dist/firefox` loads but its DB/search/messaging paths fail.
+- [x] Firefox runtime migration: **46 awaited `chrome.*` calls** moved to the `api` proxy
+      (`manager.js` 21, `background.js` 19, `options.js` 5, `bulk.js` 1) — MDN is explicit that
+      Firefox's `chrome` namespace is callback-based, so `await chrome.*` returned `undefined`
+      there. Sidebar calls now go through `toggleSidebar()` / `closeSidebar()` (sidePanel →
+      sidebarAction), and the fire-and-forget `sendMessage(...).catch()` calls became
+      `broadcast()`. Remaining `chrome.*` use is callback-style messaging / listeners / `connect`,
+      which both engines support.
+- [x] Release pipeline fixed: `release.yml` now builds **all three targets**, syncs the tag
+      version into **every** manifest (not just Chrome), removes the build's own zip before
+      packaging (it used to publish a nested zip — a store-review rejection), attaches
+      per-browser zips, and reads a curated body from `RELEASE_NOTES.md`. `pr-check.yml` builds
+      all targets, verifies per-engine manifests, and runs on Node 22 (Extension.js needs ≥ 22.12).
+- [x] Version bumped to **2.0.0** in `package.json` + `manifest.json`; `recall-*.zip` gitignored.
 
 ## What's Next (v1.1)
 

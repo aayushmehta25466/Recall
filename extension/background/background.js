@@ -11,6 +11,7 @@ import { searchBookmarks, buildSearchIndex, indexBookmark, removeFromIndex } fro
 import { runBatchCategorize, getUncategorizedBookmarks } from '../../core/ai-classifier/batchCategorizer.js';
 import { createAutoCategorizeQueue } from '../../core/ai-classifier/autoQueue.js';
 import { acquireAiBatchLock, releaseAiBatchLock } from '../../shared/aiLock.js';
+import { api, broadcast, toggleSidebar } from '../../shared/platform.js';
 import { getSettings } from '../../shared/settings.js';
 
 console.log('Recall: Background worker initialized.');
@@ -65,8 +66,7 @@ const autoAi = createAutoCategorizeQueue({
 
 /** Let an open Options page mirror a batch the worker started. */
 function broadcastAiProgress(current, total, done) {
-  chrome.runtime.sendMessage({ type: 'AI_BATCH_PROGRESS', current, total, done })
-    .catch(() => { /* nobody listening */ });
+  broadcast({ type: 'AI_BATCH_PROGRESS', current, total, done });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,9 +79,9 @@ function broadcastAiProgress(current, total, done) {
 // handling — which is what silently stopped new bookmarks from being organized.
 // ─────────────────────────────────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(handleInstalled);
-chrome.bookmarks.onCreated.addListener(handleBookmarkCreated);
-chrome.bookmarks.onRemoved.addListener(handleBookmarkRemoved);
-chrome.bookmarks.onChanged.addListener(handleBookmarkChanged);
+api.bookmarks.onCreated.addListener(handleBookmarkCreated);
+api.bookmarks.onRemoved.addListener(handleBookmarkRemoved);
+api.bookmarks.onChanged.addListener(handleBookmarkChanged);
 chrome.runtime.onConnect.addListener(handleConnect);
 chrome.runtime.onMessage.addListener(handleMessage);
 try {
@@ -110,7 +110,7 @@ async function init() {
   }, 600000);
 
   try {
-    chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true })
+    api.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true })
       ?.catch?.(() => console.log('Side panel not supported, using popup fallback'));
   } catch (e) {
     console.warn('Side panel unavailable:', e);
@@ -138,7 +138,7 @@ async function init() {
 async function reconcileNow(reason) {
   if (isSyncing) return;
   try {
-    const tree = await chrome.bookmarks.getTree();
+    const tree = await api.bookmarks.getTree();
     const { checked, trashed, skipped } = await reconcileRemovedBookmarks(tree, {
       onTrashed: (bookmark) => removeFromIndex(bookmark.url),
     });
@@ -364,7 +364,7 @@ async function handleBookmarkRemoved(id, removeInfo) {
   if (node.url) {
     // A sync move can surface here as a removal — only act if it's really gone.
     try {
-      const stillThere = await chrome.bookmarks.search({ url: node.url });
+      const stillThere = await api.bookmarks.search({ url: node.url });
       if (stillThere.length > 0) return;
     } catch { /* fall through and trash */ }
 
@@ -389,13 +389,13 @@ async function restoreBookmarkEverywhere(url) {
   if (!restored) return null;
 
   try {
-    const existing = await chrome.bookmarks.search({ url });
+    const existing = await api.bookmarks.search({ url });
     if (existing.length === 0) {
       const category = restored.category || 'Uncategorized';
       const subcategory = restored.subcategory || '';
       const parentId = await getTargetFolderId(category, subcategory);
       if (parentId) {
-        await chrome.bookmarks.create({ parentId, title: restored.title || url, url });
+        await api.bookmarks.create({ parentId, title: restored.title || url, url });
         await updateBookmark(url, { chromeFolder: getFolderPath(category, subcategory) });
         console.log(`Recall: restored bookmark recreated in Chrome → ${getFolderPath(category, subcategory)}`);
       }
@@ -412,7 +412,7 @@ async function restoreBookmarkEverywhere(url) {
 async function handleBookmarkChanged(id, changeInfo) {
   // Find the bookmark by Chrome ID — we need to look it up
   try {
-    const [bookmark] = await chrome.bookmarks.get(id);
+    const [bookmark] = await api.bookmarks.get(id);
     if (bookmark?.url && changeInfo.title) {
       await updateBookmark(bookmark.url, { title: changeInfo.title });
     }
@@ -422,16 +422,8 @@ async function handleBookmarkChanged(id, changeInfo) {
 async function handleCommand(command) {
   if (command !== 'toggle-sidebar') return;
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
-    const state = await chrome.sidePanel.getPanelBehavior({ tabId: tab.id });
-    if (state.openPanelOnActionClick) {
-      await chrome.sidePanel.close();
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-    } else {
-      await chrome.sidePanel.open({ tabId: tab.id });
-      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-    }
+    // Routes to sidePanel on Chromium and sidebarAction on Gecko.
+    await toggleSidebar();
   } catch (e) {
     console.warn('Failed to toggle sidebar:', e);
   }
@@ -467,7 +459,7 @@ function handleMessage(request, sender, sendResponse) {
   if (request.type === 'OPEN_IN_TAB_GROUP') {
     const { urls } = request;
     (async () => {
-      const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [currentTab] = await api.tabs.query({ active: true, currentWindow: true });
       const CHUNK_SIZE = 5;
       let groupId = null;
 
@@ -476,7 +468,7 @@ function handleMessage(request, sender, sendResponse) {
         const tabIds = [];
 
         for (const url of chunk) {
-          const tab = await chrome.tabs.create({ url, active: false, index: currentTab.index + 1 });
+          const tab = await api.tabs.create({ url, active: false, index: currentTab.index + 1 });
           tabIds.push(tab.id);
         }
 
@@ -485,22 +477,22 @@ function handleMessage(request, sender, sendResponse) {
           try {
             let groupNum = 1;
             try {
-              const existingGroups = await chrome.tabGroups.query({});
+              const existingGroups = await api.tabGroups.query({});
               const usedNums = existingGroups
                 .map(g => g.title?.match(/^Group (\d+)$/)?.[1])
                 .filter(Boolean)
                 .map(Number);
               while (usedNums.includes(groupNum)) groupNum++;
             } catch {}
-            groupId = await chrome.tabs.group({ tabIds });
-            await chrome.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
+            groupId = await api.tabs.group({ tabIds });
+            await api.tabGroups.update(groupId, { title: `Group ${groupNum}`, collapsed: false });
           } catch (e) {
             console.warn('Tab grouping failed:', e);
           }
         } else {
           // Subsequent chunks: add to existing group
           try {
-            await chrome.tabs.group({ groupId, tabIds });
+            await api.tabs.group({ groupId, tabIds });
           } catch (e) {
             console.warn('Adding tabs to group failed:', e);
           }
@@ -548,8 +540,8 @@ function handleMessage(request, sender, sendResponse) {
       // Trash means gone from Chrome too; Restore recreates it
       // (restoreBookmarkEverywhere).
       try {
-        const hits = await chrome.bookmarks.search({ url: request.url });
-        for (const node of hits) await chrome.bookmarks.remove(node.id);
+        const hits = await api.bookmarks.search({ url: request.url });
+        for (const node of hits) await api.bookmarks.remove(node.id);
       } catch (e) {
         console.warn('Chrome remove failed:', request.url, e);
       }

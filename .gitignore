@@ -38,6 +38,8 @@ recall-extension.pem.b64
 # Generated extension packages
 *.crx
 *.crx3
+# Release zips the workflow (and a local packaging run) writes to the repo root
+recall-*.zip
 
 # Temporary signing key restored by CI
 key.pem

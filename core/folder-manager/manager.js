@@ -1,4 +1,5 @@
 import { ENGINE_ROOT_FOLDER } from './paths.js';
+import { api } from '../../shared/platform.js';
 
 export { getFolderPath } from './paths.js';
 
@@ -27,7 +28,7 @@ async function getOrCreateFolder(parentId, title) {
   if (folderCache.has(cacheKey)) {
     // Verify cached folder still exists
     try {
-      await chrome.bookmarks.get(folderCache.get(cacheKey));
+      await api.bookmarks.get(folderCache.get(cacheKey));
       return folderCache.get(cacheKey);
     } catch {
       folderCache.delete(cacheKey); // Folder was deleted, recreate
@@ -38,13 +39,13 @@ async function getOrCreateFolder(parentId, title) {
   if (folderInFlight.has(cacheKey)) return folderInFlight.get(cacheKey);
 
   const promise = (async () => {
-    const children = await chrome.bookmarks.getChildren(parentId);
+    const children = await api.bookmarks.getChildren(parentId);
     const existing = children.find(node => node.title === title && !node.url);
     if (existing) {
       folderCache.set(cacheKey, existing.id);
       return existing.id;
     }
-    const created = await chrome.bookmarks.create({ parentId, title });
+    const created = await api.bookmarks.create({ parentId, title });
     folderCache.set(cacheKey, created.id);
     return created.id;
   })().finally(() => folderInFlight.delete(cacheKey));
@@ -95,7 +96,7 @@ export async function getBookmarksBarNode({
 } = {}) {
   if (cachedBarNode) {
     try {
-      await chrome.bookmarks.get(cachedBarNode.id);
+      await api.bookmarks.get(cachedBarNode.id);
       return cachedBarNode;
     } catch {
       cachedBarNode = null; // Bar gone (profile switched) — re-resolve below
@@ -107,7 +108,7 @@ export async function getBookmarksBarNode({
   barNodeInFlight = (async () => {
     let lastTree;
     for (let attempt = 0; attempt < attempts; attempt++) {
-      lastTree = await chrome.bookmarks.getTree();
+      lastTree = await api.bookmarks.getTree();
       const node = findBookmarksBarNode(lastTree);
       if (node) {
         cachedBarNode = { id: node.id, title: node.title };
@@ -161,7 +162,7 @@ export async function getTargetFolderId(category, subcategory) {
 /**
  * Moves a bookmark into the correct category folder.
  *
- * Prefers the Chrome ID supplied by the caller (e.g. chrome.bookmarks.onCreated),
+ * Prefers the Chrome ID supplied by the caller (e.g. api.bookmarks.onCreated),
  * which is guaranteed to reference the node that was just created. Falls back to
  * a URL lookup for bulk sync, where no event ID exists and IDs can go stale.
  * Returns the target folder ID, or null when there is nothing to move to.
@@ -174,14 +175,14 @@ export async function moveBookmarkToCategory(bookmarkUrl, category, subcategory,
     let bookmark = null;
     if (chromeId) {
       try {
-        [bookmark] = await chrome.bookmarks.get(chromeId);
+        [bookmark] = await api.bookmarks.get(chromeId);
       } catch {
         bookmark = null; // Stale ID — fall back to URL lookup
       }
     }
     if (!bookmark) {
       // Find bookmark by URL — Chrome IDs can go stale between sync phases
-      const results = await chrome.bookmarks.search({ url: bookmarkUrl });
+      const results = await api.bookmarks.search({ url: bookmarkUrl });
       bookmark = results[0];
     }
     if (!bookmark) {
@@ -189,7 +190,7 @@ export async function moveBookmarkToCategory(bookmarkUrl, category, subcategory,
       return null;
     }
 
-    await chrome.bookmarks.move(bookmark.id, { parentId: targetFolderId });
+    await api.bookmarks.move(bookmark.id, { parentId: targetFolderId });
     return targetFolderId;
   } catch (error) {
     console.error('Failed to move bookmark:', error);
@@ -209,14 +210,14 @@ export async function cleanupEmptyFolders() {
 
     // Recursively find and delete empty folders
     async function cleanNode(nodeId) {
-      const children = await chrome.bookmarks.getChildren(nodeId);
+      const children = await api.bookmarks.getChildren(nodeId);
       for (const child of children) {
         if (child.url) continue; // Skip bookmarks, only process folders
         await cleanNode(child.id); // Recurse into subfolders first
         // After recursion, check if this folder is now empty
-        const remaining = await chrome.bookmarks.getChildren(child.id);
+        const remaining = await api.bookmarks.getChildren(child.id);
         if (remaining.length === 0 && child.title !== ENGINE_ROOT_FOLDER) {
-          await chrome.bookmarks.removeTree(child.id);
+          await api.bookmarks.removeTree(child.id);
         }
       }
     }
@@ -247,7 +248,7 @@ export async function mergeDuplicateEngineFolders() {
 }
 
 async function mergeInNode(parentNode) {
-  const children = await chrome.bookmarks.getChildren(parentNode.id);
+  const children = await api.bookmarks.getChildren(parentNode.id);
   const engineFolders = children.filter(n => n.title === ENGINE_ROOT_FOLDER && !n.url);
 
   console.log(`mergeInNode: found ${engineFolders.length} "Engine Organized" folders under "${parentNode.title}" (id=${parentNode.id})`);
@@ -265,7 +266,7 @@ async function mergeInNode(parentNode) {
       // Fresh lookup each time — IDs can change
       let kids;
       try {
-        kids = await chrome.bookmarks.getChildren(fromId);
+        kids = await api.bookmarks.getChildren(fromId);
       } catch {
         return; // Folder already gone
       }
@@ -273,13 +274,13 @@ async function mergeInNode(parentNode) {
         try {
           if (kid.url) {
             // Bookmark: search by URL and move
-            const found = await chrome.bookmarks.search({ url: kid.url });
+            const found = await api.bookmarks.search({ url: kid.url });
             if (found.length) {
-              await chrome.bookmarks.move(found[0].id, { parentId: toId });
+              await api.bookmarks.move(found[0].id, { parentId: toId });
             }
           } else {
             // Subfolder: move by ID, then recurse
-            await chrome.bookmarks.move(kid.id, { parentId: toId });
+            await api.bookmarks.move(kid.id, { parentId: toId });
           }
         } catch (e) {
           console.warn('Failed to move child during merge:', kid.title, e.message);
@@ -291,9 +292,9 @@ async function mergeInNode(parentNode) {
 
     // Delete the now-empty duplicate
     try {
-      const remaining = await chrome.bookmarks.getChildren(duplicate.id);
+      const remaining = await api.bookmarks.getChildren(duplicate.id);
       if (remaining.length === 0) {
-        await chrome.bookmarks.removeTree(duplicate.id);
+        await api.bookmarks.removeTree(duplicate.id);
         console.log(`Removed duplicate folder id=${duplicate.id}`);
       } else {
         console.warn(`Duplicate folder not empty after merge, skipping delete: ${remaining.length} items left`);
@@ -312,7 +313,7 @@ async function mergeInNode(parentNode) {
 async function cleanupEmptySubfolders(folderId) {
   let children;
   try {
-    children = await chrome.bookmarks.getChildren(folderId);
+    children = await api.bookmarks.getChildren(folderId);
   } catch {
     return;
   }
@@ -321,10 +322,10 @@ async function cleanupEmptySubfolders(folderId) {
     await cleanupEmptySubfolders(child.id); // Recurse first
     // Check if empty after recursing
     try {
-      const remaining = await chrome.bookmarks.getChildren(child.id);
+      const remaining = await api.bookmarks.getChildren(child.id);
       if (remaining.length === 0) {
         console.log(`Removing empty subfolder: "${child.title}" (id=${child.id})`);
-        await chrome.bookmarks.removeTree(child.id);
+        await api.bookmarks.removeTree(child.id);
       }
     } catch {
       // Folder already gone

@@ -2,14 +2,7 @@ import { getAllBookmarks, getActiveBookmarks, getTrashedBookmarks, updateBookmar
 import { getSettings, saveSettings } from '../../shared/settings.js';
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
 import { BTN, BTN_SECONDARY, BTN_DANGER, CARD, BADGE, BADGE_DARK } from '../../shared/ui.js';
-
-// Trash/restore go through the background worker so the Chrome bookmark and the
-// in-memory search index stay in step with IndexedDB (which the worker owns).
-function sendMessage(message) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, (response) => resolve(response));
-  });
-}
+import { api, sendMessage } from '../../shared/platform.js';
 
 // Theme detection (replaces inline script for CSP compliance)
 chrome.storage.sync.get('settings', (data) => {
@@ -247,7 +240,7 @@ function attachBookmarkListeners() {
   bookmarksList.querySelectorAll('.open-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      chrome.tabs.create({ url: btn.dataset.url });
+      api.tabs.create({ url: btn.dataset.url });
     });
   });
 
@@ -417,12 +410,12 @@ bulkMoveBtn.addEventListener('click', async () => {
     // Also move in Chrome bookmarks
     if (b) {
       try {
-        const results = await chrome.bookmarks.search({ url: b.url });
+        const results = await api.bookmarks.search({ url: b.url });
         if (results.length === 0) continue;
         const chromeId = results[0].id;
         const targetFolderId = await getTargetFolderId(cat, b.subcategory || '');
         if (targetFolderId) {
-          await chrome.bookmarks.move(chromeId, { parentId: targetFolderId });
+          await api.bookmarks.move(chromeId, { parentId: targetFolderId });
         }
       } catch (e) { console.warn('Chrome move failed:', e); }
     }
@@ -459,7 +452,7 @@ bulkOpenBtn.addEventListener('click', async () => {
 
   // Single bookmark: just open in a new tab
   if (urls.length === 1) {
-    await chrome.tabs.create({ url: urls[0], active: true });
+    await api.tabs.create({ url: urls[0], active: true });
     selectedUrls.clear();
     updateBulkBar();
     return;
@@ -522,8 +515,8 @@ emptyTrashBtn.addEventListener('click', async () => {
   await sendMessage({ type: 'EMPTY_TRASH' });
   for (const b of items) {
     try {
-      const results = await chrome.bookmarks.search({ url: b.url });
-      for (const node of results) await chrome.bookmarks.remove(node.id);
+      const results = await api.bookmarks.search({ url: b.url });
+      for (const node of results) await api.bookmarks.remove(node.id);
     } catch { /* ignore */ }
   }
   loadTrash();

@@ -12,16 +12,44 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Extension.js requires >= 22.12
+          node-version: 22
           cache: npm
 
       - run: npm ci
-      - run: npm run build
+
+      # Build every target we ship, so a manifest that only breaks on one
+      # engine (e.g. a Chromium-only permission) fails the PR, not the release.
+      - name: Build all targets
+        run: |
+          npm run build:chrome
+          npm run build:firefox
+          npm run build:opera
+
+      - name: Verify per-target manifests
+        run: |
+          for target in chrome firefox opera; do
+            MANIFEST="dist/$target/manifest.json"
+            if [ ! -f "$MANIFEST" ]; then
+              echo "::error::$MANIFEST does not exist."
+              exit 1
+            fi
+            node -e "
+              const m = require('./$MANIFEST');
+              const bg = m.background?.service_worker ? 'service_worker' : 'scripts';
+              const panel = m.side_panel ? 'side_panel' : (m.sidebar_action ? 'sidebar_action' : 'none');
+              console.log('$target'.padEnd(8), m.version, '| bg=' + bg, '| panel=' + panel);
+            "
+          done
+
       - run: npm test
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: recall-extension-build
-          path: dist/chromium/
+          name: recall-extension-builds
+          path: |
+            dist/chrome/
+            dist/firefox/
+            dist/opera/
           retention-days: 7

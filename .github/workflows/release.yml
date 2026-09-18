@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------------------------------
-      # 2. Setup Node.js
+      # 2. Setup Node.js (Extension.js requires >= 22.12)
       # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,10 +38,10 @@ jobs:
         run: npm ci
 
       # ---------------------------------------------------------
-      # 4. Build extension
+      # 4. Tests must pass before anything is published
       # ---------------------------------------------------------
-      - name: Build extension
-        run: npm run build
+      - name: Run tests
+        run: npm test
 
       # ---------------------------------------------------------
       # 5. Get version from Git tag
@@ -57,79 +57,89 @@ jobs:
           echo "Building Recall version: $VERSION"
 
       # ---------------------------------------------------------
-      # 6. Sync manifest version
+      # 6. Build every browser target
+      #
+      # Each script writes `dist/<target>`; the same scripts are used
+      # locally, so CI output cannot drift from a hand-built one.
       # ---------------------------------------------------------
-      - name: Sync manifest version
+      - name: Build all browser targets
+        run: |
+          npm run build:chrome
+          npm run build:firefox
+          npm run build:opera
+
+      # ---------------------------------------------------------
+      # 7. Sync the tag version into EVERY target's manifest
+      #
+      # Chrome is not special: the Firefox manifest is what AMO reads,
+      # and the Opera one is what its store reads.
+      # ---------------------------------------------------------
+      - name: Sync manifest version into every target
         run: |
           node <<'NODE'
           const fs = require('fs');
 
-          const manifestPath = 'dist/chromium/manifest.json';
           const version = process.env.VERSION;
+          const targets = ['chrome', 'firefox', 'opera'];
 
-          if (!fs.existsSync(manifestPath)) {
-            console.error(`Manifest not found: ${manifestPath}`);
-            process.exit(1);
+          for (const target of targets) {
+            const manifestPath = `dist/${target}/manifest.json`;
+
+            if (!fs.existsSync(manifestPath)) {
+              console.error(`Manifest not found: ${manifestPath}`);
+              process.exit(1);
+            }
+
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            manifest.version = version;
+            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+
+            console.log(`${manifestPath} → ${version}`);
           }
-
-          const manifest = JSON.parse(
-            fs.readFileSync(manifestPath, 'utf8')
-          );
-
-          manifest.version = version;
-
-          fs.writeFileSync(
-            manifestPath,
-            JSON.stringify(manifest, null, 2) + '\n'
-          );
-
-          console.log(`Manifest version updated to ${version}`);
           NODE
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
 
       # ---------------------------------------------------------
-      # 7. Verify final extension build
+      # 8. Verify each build resolved its own engine shape
       # ---------------------------------------------------------
-      - name: Verify extension build
+      - name: Verify browser builds
         run: |
-          MANIFEST="dist/chromium/manifest.json"
+          for target in chrome firefox opera; do
+            MANIFEST="dist/$target/manifest.json"
 
-          if [ ! -f "$MANIFEST" ]; then
-            echo "::error::$MANIFEST does not exist."
-            exit 1
-          fi
+            if [ ! -f "$MANIFEST" ]; then
+              echo "::error::$MANIFEST does not exist."
+              exit 1
+            fi
 
-          echo "Final extension contents:"
-          find dist/chromium -maxdepth 3 -type f | sort
-
-          echo ""
-          echo "Manifest:"
-          cat "$MANIFEST"
+            node -e "
+              const m = require('./$MANIFEST');
+              const bg = m.background?.service_worker ? 'service_worker' : 'scripts';
+              const panel = m.side_panel ? 'side_panel' : (m.sidebar_action ? 'sidebar_action' : 'none');
+              console.log('$target'.padEnd(8), m.version, '| bg=' + bg, '| panel=' + panel);
+            "
+          done
 
       # ---------------------------------------------------------
-      # 8. Create final extension ZIP
+      # 9. Create one ZIP per browser
       #
-      # IMPORTANT:
-      # This ZIP contains ONLY the built extension, with manifest.json
-      # at its root (as the Chrome Web Store expects).
+      # IMPORTANT: the build can emit its own zip inside dist/<target>.
+      # It is removed first, otherwise the published archive would contain
+      # a nested zip — which store review rejects.
       # ---------------------------------------------------------
-      - name: Create extension ZIP
+      - name: Create per-browser ZIPs
         run: |
-          cd dist/chromium
+          VERSION="${{ steps.version.outputs.VERSION }}"
 
-          # Drop the zip produced by the build so it isn't nested inside itself
-          rm -f recall-chrome.zip
-
-          zip -r \
-            "../../recall-${{ steps.version.outputs.VERSION }}-extension.zip" \
-            .
+          for target in chrome firefox opera; do
+            rm -f dist/$target/*.zip
+            (cd dist/$target && zip -r "../../recall-${VERSION}-${target}.zip" .)
+            echo "packaged recall-${VERSION}-${target}.zip"
+          done
 
       # ---------------------------------------------------------
-      # 9. Create source ZIP
-      #
-      # This contains the actual project source, but excludes
-      # generated build files and dependencies.
+      # 10. Create source ZIP
       # ---------------------------------------------------------
       - name: Create source ZIP
         run: |
@@ -142,101 +152,71 @@ jobs:
                "*.crx" \
                "*.zip" \
                "*.pem" \
-               "*.b64"
+               "*.b64" \
+               "release-body.md"
 
       # ---------------------------------------------------------
-      # 10. Verify release artifacts
+      # 11. Verify release artifacts
       # ---------------------------------------------------------
       - name: Verify release artifacts
         run: |
-          EXTENSION_ZIP="recall-${{ steps.version.outputs.VERSION }}-extension.zip"
-          SOURCE_ZIP="recall-${{ steps.version.outputs.VERSION }}-source.zip"
+          VERSION="${{ steps.version.outputs.VERSION }}"
 
-          if [ ! -s "$EXTENSION_ZIP" ]; then
-            echo "::error::Extension ZIP was not created."
-            exit 1
-          fi
+          for target in chrome firefox opera; do
+            ZIP="recall-${VERSION}-${target}.zip"
+            if [ ! -s "$ZIP" ]; then
+              echo "::error::$ZIP was not created."
+              exit 1
+            fi
+          done
 
+          SOURCE_ZIP="recall-${VERSION}-source.zip"
           if [ ! -s "$SOURCE_ZIP" ]; then
-            echo "::error::Source ZIP was not created."
+            echo "::error::$SOURCE_ZIP was not created."
             exit 1
           fi
 
           echo "Release artifacts:"
-          ls -lh "$EXTENSION_ZIP"
-          ls -lh "$SOURCE_ZIP"
+          ls -lh recall-*.zip
 
       # ---------------------------------------------------------
-      # 11. Generate changelog
+      # 12. Assemble the release body
+      #
+      # Curated notes live in RELEASE_NOTES.md (reviewable in a PR);
+      # the version and compare link are appended here.
       # ---------------------------------------------------------
-      - name: Get changelog from commits
-        id: changelog
+      - name: Assemble release body
         shell: bash
         run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
-          if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
-          fi
-
-          echo "COMMITS<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$COMMITS" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            cat RELEASE_NOTES.md
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Version:** \`${VERSION}\`"
+            if [ -n "$PREV_TAG" ]; then
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}"
+            fi
+          } > release-body.md
 
       # ---------------------------------------------------------
-      # 12. Create GitHub Release
+      # 13. Create GitHub Release
       # ---------------------------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "🚀 Recall v${{ steps.version.outputs.VERSION }}"
           tag_name: "v${{ steps.version.outputs.VERSION }}"
-
-          body: |
-            ## What's New
-
-            ${{ steps.changelog.outputs.COMMITS }}
-
-            ---
-
-            ## 📦 Downloads
-
-            ### Recall Extension
-
-            Download:
-
-            `recall-${{ steps.version.outputs.VERSION }}-extension.zip`
-
-            This ZIP contains the final production build of Recall.
-
-            ### Source Code
-
-            Download:
-
-            `recall-${{ steps.version.outputs.VERSION }}-source.zip`
-
-            This contains the project source code for developers.
-
-            ---
-
-            ## 🚀 Install Recall
-
-            1. Download the `-extension.zip` file.
-            2. Extract the ZIP file.
-            3. Open Chrome and go to:
-               `chrome://extensions/`
-            4. Enable **Developer mode**.
-            5. Click **Load unpacked**.
-            6. Select the extracted extension folder containing `manifest.json`.
-
-            ---
-
-            **Version:** `${{ steps.version.outputs.VERSION }}`
+          body_path: release-body.md
 
           files: |
-            recall-${{ steps.version.outputs.VERSION }}-extension.zip
+            recall-${{ steps.version.outputs.VERSION }}-chrome.zip
+            recall-${{ steps.version.outputs.VERSION }}-firefox.zip
+            recall-${{ steps.version.outputs.VERSION }}-opera.zip
             recall-${{ steps.version.outputs.VERSION }}-source.zip
 
           draft: false

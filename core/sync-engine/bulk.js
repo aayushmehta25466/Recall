@@ -10,6 +10,7 @@ import { parseEngineFolderPath } from '../folder-manager/paths.js';
 import { normalizeUrl } from '../duplicate-detector/detector.js';
 import { getSettings } from '../../shared/settings.js';
 import { validateSubcategory } from '../taxonomy/categories.js';
+import { api, broadcast } from '../../shared/platform.js';
 
 const SKIP_PROTOCOLS = ['chrome:', 'chrome-extension:', 'about:', 'file:', 'javascript:'];
 const SKIP_DOMAINS = ['chromewebstore.google.com', 'chrome.google.com'];
@@ -51,12 +52,7 @@ function flattenTree(nodes, parentPath = '', arr = [], depth = 0) {
 }
 
 function sendProgress(current, total, url) {
-  chrome.runtime.sendMessage({
-    type: 'SYNC_PROGRESS',
-    current,
-    total,
-    url,
-  }).catch(() => {});
+  broadcast({ type: 'SYNC_PROGRESS', current, total, url });
 }
 
 /**
@@ -252,7 +248,7 @@ export async function runBulkSync(moveInChrome = true) {
   clearFolderCache();
   await mergeDuplicateEngineFolders(); // ponytail: merge any duplicate folders first
   const settings = await getSettings();
-  const tree = await chrome.bookmarks.getTree();
+  const tree = await api.bookmarks.getTree();
   const allBookmarks = flattenTree(tree);
   const total = allBookmarks.length;
   console.log(`Bulk sync: ${total} bookmarks found in Chrome`);
