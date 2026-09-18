@@ -1007,9 +1007,16 @@ batchCategorizeBtn.addEventListener('click', async () => {
   if (batchCategorizeBtn.disabled) return;
   try {
     const { runBatchCategorize } = await import('../../core/ai-classifier/batchCategorizer.js');
+    const { acquireAiBatchLock, releaseAiBatchLock } = await import('../../shared/aiLock.js');
     const settings = await getSettings();
     if (!settings.openrouterApiKey) {
       alert('Add an OpenRouter API key in Settings to use AI categorization.');
+      return;
+    }
+
+    // The worker runs the same batch automatically (auto-AI on save) — one at a time.
+    if (!(await acquireAiBatchLock())) {
+      alert('AI categorization is already running. Give it a moment and try again.');
       return;
     }
 
@@ -1020,13 +1027,19 @@ batchCategorizeBtn.addEventListener('click', async () => {
     batchPercent.textContent = '0%';
     batchStatus.textContent = 'Starting...';
 
-    const { processed, categorized, errors } = await runBatchCategorize(settings, (current, total) => {
-      const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-      batchBar.style.width = pct + '%';
-      batchPercent.textContent = pct + '%';
-      batchStatus.textContent = `Processing ${current} of ${total}...`;
-    });
+    let result;
+    try {
+      result = await runBatchCategorize(settings, (current, total) => {
+        const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+        batchBar.style.width = pct + '%';
+        batchPercent.textContent = pct + '%';
+        batchStatus.textContent = `Processing ${current} of ${total}...`;
+      });
+    } finally {
+      await releaseAiBatchLock();
+    }
 
+    const { processed, categorized, errors } = result;
     if (errors && errors.length > 0) {
       batchStatus.textContent = `Failed: ${categorized}/${processed} categorized. First error: ${errors[0]}`;
       console.error('Batch categorize errors:', errors);
@@ -1049,6 +1062,29 @@ batchCategorizeBtn.addEventListener('click', async () => {
     batchStatus.textContent = `Error: ${e.message}`;
     batchCategorizeBtn.disabled = false;
     batchCategorizeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+});
+
+// Auto-AI batch started by the background worker (autoAiCategorize on save):
+// mirror its progress here when the Review tab is open.
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type !== 'AI_BATCH_PROGRESS') return;
+  const { current, total, done } = message;
+  batchProgress.classList.remove('hidden');
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  batchBar.style.width = pct + '%';
+  batchPercent.textContent = pct + '%';
+  batchStatus.textContent = done
+    ? 'Auto AI categorization complete.'
+    : `Auto AI: ${current} of ${total}...`;
+
+  if (done) {
+    setTimeout(() => {
+      batchProgress.classList.add('hidden');
+      batchBar.style.width = '0%';
+      loadReview();
+      loadBookmarks();
+    }, 2000);
   }
 });
 

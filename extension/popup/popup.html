@@ -6,52 +6,62 @@
   <title>Recall</title>
   <link rel="stylesheet" href="./popup.css">
 </head>
-<body class="w-[520px] h-[620px] p-space-5 m-0 overflow-hidden flex flex-col bg-surface-base text-text-base font-primary">
-  <header class="flex items-center justify-between mb-space-3">
-    <div>
-      <h1 class="text-md font-extrabold tracking-tight text-text-base flex items-center gap-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-accent-green"></span>
-        Recall
-      </h1>
+<body class="w-[520px] h-[620px] m-0 p-3 box-border overflow-hidden flex flex-col bg-surface-base text-text-base font-primary">
+  <header class="flex items-center justify-between gap-2 mb-2">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-accent-green shrink-0"></span>
+      <h1 class="text-md font-extrabold tracking-tight text-text-base truncate">Recall</h1>
     </div>
-    <div class="flex items-center gap-space-1">
-      <button id="homeBtn" title="Open Home" class="p-space-3 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all duration-fast cursor-pointer shadow-clay-btn hover:shadow-clay-btn-hover hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-clay-pressed">
+    <div class="flex items-center gap-1 shrink-0">
+      <button id="homeBtn" title="Open home" class="p-1.5 rounded-sm text-text-secondary border-2 border-border-default bg-surface-card hover:text-text-base hover:bg-surface-raised hover:border-accent-green transition-all cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
       </button>
-      <button id="organizeBtn" title="Organize All" class="p-space-3 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all duration-fast cursor-pointer shadow-clay-btn hover:shadow-clay-btn-hover hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-clay-pressed">
+      <button id="settingsBtn" title="Settings" class="p-1.5 rounded-sm text-text-secondary border-2 border-border-default bg-surface-card hover:text-text-base hover:bg-surface-raised hover:border-accent-green transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </button>
+      <button id="organizeBtn" title="Organize all bookmarks" class="p-1.5 rounded-sm text-text-secondary border-2 border-border-default bg-surface-card hover:text-text-base hover:bg-surface-raised hover:border-accent-green transition-all cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
-      <button id="settingsBtn" title="Open Settings" class="p-space-3 rounded-sm text-text-secondary hover:text-text-base border-2 border-border-default hover:bg-surface-raised hover:border-accent-green transition-all duration-fast cursor-pointer shadow-clay-btn hover:shadow-clay-btn-hover hover:-translate-y-[1px] active:translate-y-[1px] active:shadow-clay-pressed">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <button id="trashBtn" title="Open trash" class="p-1.5 rounded-sm text-text-secondary border-2 border-border-default bg-surface-card hover:text-text-base hover:bg-surface-raised hover:border-accent-red transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </button>
+      <button id="closeBtn" title="Close" class="p-1.5 rounded-sm text-text-secondary border-2 border-border-default bg-surface-card hover:text-text-base hover:bg-surface-raised hover:border-accent-red transition-all cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
   </header>
 
-  <main class="flex-1 flex flex-col gap-space-3 min-h-0">
-    <div class="relative">
-      <input
-        type="text"
-        id="searchInput"
-        placeholder="Search bookmarks..."
-        class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-base text-text-base px-space-4 py-space-3 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[48px]"
-        autocomplete="off"
-      >
-      <div id="searchHistory" class="hidden absolute top-full left-0 right-0 mt-1 bg-surface-card border-2 border-border-default rounded-sm shadow-clay z-50 max-h-48 overflow-y-auto"></div>
-    </div>
+  <div class="relative mb-2">
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search bookmarks..."
+      class="w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-3 py-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[40px]"
+      autocomplete="off"
+    >
+    <div id="searchHistory" class="hidden absolute top-full left-0 right-0 mt-1 bg-surface-card border-2 border-border-default rounded-sm shadow-clay z-50 max-h-48 overflow-y-auto"></div>
+  </div>
 
-    <div id="resultsMeta" class="hidden items-center justify-between text-[11px] text-text-secondary">
-      <span id="resultCount"></span>
-      <button id="selectAllLink" class="font-bold text-accent-green hover:underline cursor-pointer">Select all</button>
+  <div class="flex items-center justify-between gap-2 mb-1.5 text-[11px] text-text-secondary">
+    <div class="truncate">
+      <span id="totalCount" class="font-bold text-text-base">0</span> bookmarks ·
+      <span id="categoryCount" class="font-bold text-text-base">0</span> categories ·
+      <span id="uncategorizedCount" class="font-bold text-text-base">0</span> uncategorized
     </div>
+    <button id="selectAllLink" class="shrink-0 font-bold text-accent-green hover:underline cursor-pointer">Select all</button>
+  </div>
 
-    <div id="actionBar" class="hidden"></div>
+  <div id="categoryFilters" class="flex gap-1.5 flex-nowrap overflow-x-auto mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <button class="category-filter px-2.5 py-1 text-[11px] font-semibold border rounded-full cursor-pointer whitespace-nowrap bg-accent-green text-white border-accent-green" data-category="all">All</button>
+  </div>
 
-    <div id="resultsContainer" class="flex-1 overflow-y-auto pr-space-2 flex flex-col gap-space-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-muted [&::-webkit-scrollbar-thumb]:rounded-xs">
-      <div class="flex items-center justify-center h-full text-text-secondary text-sm">
-        Start typing to search your knowledge base...
-      </div>
+  <div id="actionBar" class="hidden"></div>
+
+  <div id="resultsContainer" class="flex-1 overflow-y-auto flex flex-col gap-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-muted [&::-webkit-scrollbar-thumb]:rounded-xs">
+    <div class="flex items-center justify-center h-full text-text-secondary text-sm">
+      Loading bookmarks…
     </div>
-  </main>
+  </div>
 
   <script type="module" src="./popup.js"></script>
 </body>

@@ -100,11 +100,24 @@
         horizontal container. (`#categoryFilters` rules in `popup.css` are deliberately
         unlayered so they can override the global scrollbar rule.)
 - [x] AI on save (opt-in): new `autoAiCategorize` setting (default **off**, AI section
-      toggle). `classifyBookmark()` takes `{ useAI }` — creation passes
-      `settings.autoAiCategorize`, bulk sync keeps `true`. Fast rules always run first;
-      AI only on a miss with a key set. Review tab's "Categorize with AI" button is now
-      disabled (greyed, tooltip) when there is nothing uncategorized, owned by
-      `setBatchButtonState()` in `loadReview()`. Tests: `tests/classify-bookmark.test.js`.
+      toggle). Review tab's "Categorize with AI" button is disabled (greyed, tooltip) when
+      there is nothing uncategorized, owned by `setBatchButtonState()` in `loadReview()`.
+      Tests: `tests/classify-bookmark.test.js`.
+- [x] Auto-AI now runs the **batch** workflow, not a per-bookmark call.
+      - Creation passes `useAI: false` — fast rules only. Anything that lands
+        `Uncategorized` is queued via `autoAi.schedule()` (`core/ai-classifier/autoQueue.js`),
+        which runs `runBatchCategorize` (15 URLs/request) over **every** uncategorized
+        bookmark. Paying the ~1.5k-token taxonomy prompt once per 15 URLs instead of once
+        per bookmark is the whole point.
+      - Guards, each with its own log: setting off, no API key, `isSyncing`,
+        **`hasWork()` false (so a no-op never costs a token)**, lock held. Debounced 4 s
+        (a burst of saves = one run); a denied lock re-schedules instead of overlapping.
+      - `shared/aiLock.js` (`chrome.storage.local`, 5-min TTL) serializes the worker's
+        auto-run and the options page's manual Review run — same IndexedDB, two contexts.
+      - The worker broadcasts `AI_BATCH_PROGRESS`; the Review tab mirrors it in the
+        existing progress bar.
+      - Tests: `tests/autoQueue.test.js` (debounce, all guards, lock deferral, error,
+        one-extra-run-after-a-mid-run-schedule).
 - [x] Bookmarks-bar lookup no longer assumes id "1": tries known ids
       (`1`, `toolbar_____`), retries a not-yet-loaded tree, then falls back to the
       root's first folder — and logs the real root children when it can't resolve.
@@ -145,6 +158,34 @@
 - [x] All 38 tests passing
 - [x] Context files updated
 
+### Cross-browser targets — Firefox + Opera
+- [x] **Popup ↔ side panel parity.** Both surfaces are now one implementation:
+      `shared/ui/searchPanel.js` → `mountSearchPanel({ variant })`, mounted by 3-line
+      entry files. `extension/popup/popup.html` and `extension/sidepanel/sidepanel.html`
+      are the same structure (verified: identical `id` sets in the built output), differing
+      only in `<body>` sizing. `variant` covers the real differences: close button
+      (`closeSidebar()` vs `window.close()`), canvas, auto-focus. The old duplicated
+      ~500-line `popup.js` / `sidepanel.js` are gone, so they can't drift again.
+- [x] `shared/platform.js` — `api` = lazily-resolved `browser ?? chrome`, `caps`
+      (`sidePanel` / `tabGroups`), promise `sendMessage` / `storageGet|Set|Remove`,
+      `broadcast`, and `closeSidebar` / `toggleSidebar` (routing to `sidebarAction` on Gecko).
+- [x] Build targets: `build:chrome`, `build:firefox`, `build:opera`, `build:all`
+      (`--browser=chrome,firefox,opera --zip`), plus `dev:firefox` / `dev:opera`.
+      Zips land in `dist/<browser>/`.
+- [x] One source, per-engine manifests via browser-prefixed keys:
+      `chromium:permissions` / `chromium:background` / `chromium:side_panel` and
+      `firefox:permissions` / `firefox:background` / `firefox:sidebar_action`.
+      Verified: the Firefox manifest drops `sidePanel` and uses `background.scripts` +
+      `sidebar_action`; Chrome keeps `sidePanel` + `background.service_worker`.
+- [x] Firefox AMO readiness: `browser_specific_settings.gecko.data_collection_permissions`
+      (`required: ["none"]`, `optional: ["bookmarksInfo", "websiteContent"]` for the opt-in AI
+      path). `strict_min_version` raised to **140.0** — tab groups need 139, but the built-in
+      data-consent experience needs 140. `addons-linter` reports 0 warnings / 0 errors.
+- [ ] **Still required for a *working* Firefox build:** migrate `chrome.*` call sites to a
+      `browser ?? chrome` adapter. MDN is explicit that Firefox's `chrome` namespace is
+      callback-based, so every `await chrome.*` call returns `undefined` there. Until that
+      lands, `dist/firefox` loads but its DB/search/messaging paths fail.
+
 ## What's Next (v1.1)
 
 - [ ] Test Chrome build in browser (load dist/chrome/)
@@ -159,8 +200,8 @@
 
 ## Test Status
 
-- **84 tests passing** (11 test suites)
-- Search, taxonomy, extractor, inference, detector, folder-manager, moveQueue, bulk-sync, reconcile, db-normalize, classify-bookmark
+- **93 tests passing** (12 test suites)
+- Search, taxonomy, extractor, inference, detector, folder-manager, moveQueue, bulk-sync, reconcile, db-normalize, classify-bookmark, autoQueue
 
 ## Build Status
 

@@ -2,26 +2,50 @@
   "manifest_version": 3,
   "name": "Recall",
   "version": "1.0.0",
-  "description": "AI-powered bookmark organizer for Chrome.",
-  "permissions": [
+  "description": "AI-powered bookmark organizer for Chromium and Firefox.",
+  "chromium:permissions": [
     "bookmarks",
     "storage",
     "tabs",
     "tabGroups",
     "activeTab",
     "scripting",
-    "sidePanel",
-    "windows"
+    "sidePanel"
   ],
-  "background": {
+  "firefox:permissions": [
+    "bookmarks",
+    "storage",
+    "tabs",
+    "tabGroups",
+    "activeTab",
+    "scripting"
+  ],
+  "chromium:background": {
     "service_worker": "extension/background/background.js",
     "type": "module"
+  },
+  "firefox:background": {
+    "scripts": ["extension/background/background.js"]
   },
   "action": {
     "default_popup": "extension/popup/popup.html"
   },
-  "side_panel": {
+  "chromium:side_panel": {
     "default_path": "extension/sidepanel/sidepanel.html"
+  },
+  "firefox:sidebar_action": {
+    "default_panel": "extension/sidepanel/sidepanel.html",
+    "default_title": "Recall"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "recall@aayushmehta25466",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": ["bookmarksInfo", "websiteContent"]
+      }
+    }
   },
   "options_page": "extension/options/options.html",
   "commands": {

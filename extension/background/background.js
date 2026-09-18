@@ -8,11 +8,66 @@ import { parseEngineFolderPath } from '../../core/folder-manager/paths.js';
 import { reconcileRemovedBookmarks } from '../../core/sync-engine/reconcile.js';
 import { saveBookmark, getBookmark, updateBookmark, trashBookmark, restoreBookmark, emptyTrash, purgeOldTrash, getTrashedBookmarks, getAllBookmarks, saveBookmarks } from '../../database/indexeddb/db.js';
 import { searchBookmarks, buildSearchIndex, indexBookmark, removeFromIndex } from '../../core/search-index/search.js';
+import { runBatchCategorize, getUncategorizedBookmarks } from '../../core/ai-classifier/batchCategorizer.js';
+import { createAutoCategorizeQueue } from '../../core/ai-classifier/autoQueue.js';
+import { acquireAiBatchLock, releaseAiBatchLock } from '../../shared/aiLock.js';
 import { getSettings } from '../../shared/settings.js';
 
 console.log('Recall: Background worker initialized.');
 
 let isSyncing = false;
+
+/**
+ * Auto-AI on save.
+ *
+ * Bookmark creation only runs the fast rules; anything that lands in
+ * "Uncategorized" is handed to the *batch* workflow here, so the fixed taxonomy
+ * prompt is paid once per 15 URLs instead of once per bookmark.
+ */
+const autoAi = createAutoCategorizeQueue({
+  runBatch: runBatchCategorize,
+  getSettings,
+  isSyncing: () => isSyncing,
+  hasWork: async () => (await getUncategorizedBookmarks()).length > 0,
+  acquireLock: acquireAiBatchLock,
+  releaseLock: releaseAiBatchLock,
+  log: (event, a, b) => {
+    switch (event) {
+      case 'off':
+        console.log('Recall: auto-AI off (setting disabled)');
+        break;
+      case 'no-key':
+        console.warn('Recall: auto-AI skipped — no OpenRouter API key');
+        break;
+      case 'syncing':
+        console.log('Recall: auto-AI skipped — sync in progress');
+        break;
+      case 'nothing':
+        console.log('Recall: auto-AI skipped — nothing uncategorized');
+        break;
+      case 'locked':
+        console.log('Recall: auto-AI skipped — another batch is running');
+        break;
+      case 'progress':
+        console.log(`Recall: auto-AI ${a}/${b}`);
+        broadcastAiProgress(a, b, false);
+        break;
+      case 'done':
+        console.log(`Recall: auto-AI finished — ${a}/${b} categorized`);
+        broadcastAiProgress(b, b, true);
+        break;
+      case 'error':
+        console.error('Recall: auto-AI failed:', a);
+        break;
+    }
+  },
+});
+
+/** Let an open Options page mirror a batch the worker started. */
+function broadcastAiProgress(current, total, done) {
+  chrome.runtime.sendMessage({ type: 'AI_BATCH_PROGRESS', current, total, done })
+    .catch(() => { /* nobody listening */ });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EVENT LISTENERS — registered synchronously, before any other work.
@@ -198,14 +253,13 @@ async function processNewBookmark(id, bookmark) {
 
       metadata = extractMetadata(html, url);
       contentType = inferContentType(metadata, url);
-      // Fast rules first; AI only when the user opted in via autoAiCategorize.
-      ({ category, subcategory } = await classifyBookmark(metadata, url, settings, {
-        useAI: settings.autoAiCategorize === true,
-      }));
+      // Fast rules ONLY. AI for saved bookmarks runs through the batch queue below,
+      // which pays the (large, fixed) taxonomy prompt once per 15 URLs.
+      ({ category, subcategory } = await classifyBookmark(metadata, url, settings, { useAI: false }));
       category = category || 'Uncategorized';
       console.log(
-        settings.autoAiCategorize && category !== 'Uncategorized'
-          ? `Recall: auto-AI classified ${url} → ${category} / ${subcategory || '—'}`
+        category === 'Uncategorized'
+          ? `Recall: no fast match for ${url} → Uncategorized`
           : `Recall: fast-classified ${url} → ${category} / ${subcategory || '—'}`
       );
     }
@@ -238,6 +292,13 @@ async function processNewBookmark(id, bookmark) {
     await saveBookmark(processedBookmark);
     // Make it searchable immediately (the index is otherwise only rebuilt on sync)
     indexBookmark(processedBookmark);
+
+    // Hand it to the AI batch workflow when the user opted in. The batch picks up
+    // every uncategorized bookmark, so this one is included.
+    if (settings.autoAiCategorize && category === 'Uncategorized') {
+      console.log('Recall: auto-AI queued — will run in 4s');
+      autoAi.schedule();
+    }
 
     if (targetFolderId) {
       console.log(`Recall: new bookmark FILED → ${getFolderPath(category, subcategory)}`);
