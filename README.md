@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Chrome-Extension-blue" alt="Chrome Extension">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License: Apache-2.0">
   <img src="https://img.shields.io/badge/Manifest-V3-orange" alt="Manifest V3">
 </p>
 

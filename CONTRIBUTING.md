@@ -87,4 +87,7 @@ tests/            → Jest tests
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+Recall is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Aayush Mehta.
+
+By contributing, you agree that your contributions will be licensed under the same
+Apache License 2.0, without any additional terms or conditions (see section 5 of the LICENSE).
