@@ -72,12 +72,21 @@ export function storageRemove(area, keys) {
 
 /* ── side panel (Chromium) / sidebar (Firefox) ─────────────────────────── */
 
+/**
+ * Close the side panel / sidebar.
+ *
+ * Chromium only grew `sidePanel.close()` in 141, and it needs a target: the
+ * global panel this extension uses is closed by `windowId` (a bare `close()`
+ * rejects). Older Chromium has no close method at all, so the panel page —
+ * which is the only caller — closes itself with `window.close()`.
+ */
 export async function closeSidebar() {
   if (api.sidePanel?.close) {
     try {
-      await api.sidePanel.close();
+      const { id: windowId } = (await api.windows?.getCurrent?.()) || {};
+      await api.sidePanel.close({ windowId });
       return true;
-    } catch { /* fall through */ }
+    } catch { /* pre-141 or no window context — fall through */ }
   }
   if (api.sidebarAction?.close) {
     try {
@@ -85,7 +94,12 @@ export async function closeSidebar() {
       return true;
     } catch { /* fall through */ }
   }
-  return false;
+  try {
+    window.close();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function toggleSidebar() {
