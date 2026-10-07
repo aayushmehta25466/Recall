@@ -1,108 +1,94 @@
 <p align="center">
-  <a href="README.md"><b>Readme</b></a> · 
-  <a href="CONTRIBUTING.md">Contributing</a> · 
+  <a href="README.md"><b>Readme</b></a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="LICENSE">License</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Chrome-Extension-blue" alt="Chrome Extension">
-  <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License: Apache-2.0">
-  <img src="https://img.shields.io/badge/Manifest-V3-orange" alt="Manifest V3">
+  <img src="https://img.shields.io/badge/version-2.0.1-blue" alt="Version 2.0.1">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License: Apache-2.0">
+  <img src="https://img.shields.io/badge/manifest-V3-orange" alt="Manifest V3">
+  <img src="https://img.shields.io/badge/chrome%20·%20firefox%20·%20opera-supported-success" alt="Chrome, Firefox, Opera">
 </p>
 
 <h1 align="center">Recall</h1>
 
 <p align="center">
-  A Chrome extension that automatically organizes your bookmarks using fast rules + AI fallback.
+  A smart, local-first bookmark organizer. Rules-first auto-sorting, optional AI,<br>
+  and powerful search — with zero server involved.
 </p>
 
+<!-- Screenshot or GIF of the popup + organized folders goes here -->
+
+## Why Recall?
+
+Your bookmarks pile up and never get organized. Recall takes each one you save, classifies it, and files it into the right Chrome (or Firefox) folder — instantly, using fast built-in rules. AI is only consulted in batches for the tricky ones, and only if you opt in.
+
+Everything stays on your device: no account, no server, no tracking. Classification runs locally (domain maps + keyword scoring), your data lives in the browser, and the AI fallback just sends a category prompt to OpenRouter.
+
+## Contents
+
+- [Features](#features)
+- [Install](#install)
+- [How bookmarks are categorized](#how-bookmarks-are-categorized)
+- [Optional AI setup](#optional-ai-setup)
+- [Development & releases](#development--releases)
+
 ---
 
-## What It Does
+## Features
 
-Recall keeps your bookmarks organized automatically. When you save a bookmark, it fetches the page metadata, classifies it using a two-phase approach (fast rules first, AI as fallback), and moves it into the right Chrome folder.
-
-- **Smart categorization** — Fast rules (domain mappings + keywords) with AI fallback for unknown sites
-- **Full-text search** — BM25 search with fuzzy matching and typo tolerance
-- **Bulk operations** — select, tag, export, or delete multiple bookmarks at once
-- **Duplicate detection** — find and merge duplicate bookmarks
-- **Trash & restore** — soft-delete with configurable auto-purge
-- **Import/Export** — JSON, CSV, and Chrome HTML formats
+- **Auto-organizing** — every saved bookmark is fetched, classified, and moved into the right folder in real time
+- **Two-phase classification** — instant rules first (no network), AI only for stragglers
+- **Full-text search** — BM25 search with fuzzy matching and typo tolerance; `Ctrl/⌘+K` focuses from anywhere
 - **Tab grouping** — open multiple bookmarks in Chrome tab groups
+- **Duplicate handling** — URL normalization catches the same page saved twice (tracking params, trailing slashes)
+- **Trash & restore** — soft-delete with configurable auto-purge (7/30 days or never, max 500 items)
+- **Import/Export** — JSON, CSV, and Chrome HTML formats
+- **Custom rules** — add your own domain → category mappings in Settings
+
+## Install
+
+### From a release
+
+Grab the zip for your browser from [Releases](https://github.com/aayushmehta25466/Recall/releases), unzip it, then load it:
+
+- **Chrome / Opera:** open `chrome://extensions/` → enable **Developer mode** → **Load unpacked** → select the unzipped folder
+- **Firefox** (140+): open `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick the unzipped `manifest.json`. It lives in Firefox's native sidebar and reopens via the sidebar button. For a permanent install, AMO requires a signed build.
+
+### From source
+
+```bash
+git clone https://github.com/aayushmehta25466/Recall.git
+cd Recall
+npm install
+npm run build          # dist/chromium/
+npm run build:firefox  # dist/firefox/ (optional)
+```
+
+Then load `dist/chromium/` via the Chrome steps above.
+
+### First run
+
+On install, Recall runs an initial organize pass and builds its search index. Click the toolbar icon to open the popup (or `Ctrl/⌘+Shift+K` to toggle the side panel), and hit **Organize All** (the refresh icon in the popup header) to sort your existing bookmarks.
 
 ---
 
-## How It Works
+## How bookmarks are categorized
 
-### Two-Phase Categorization
+1. You save a bookmark — from the browser save dialog, by hand, or via import.
+2. Recall fetches the page HTML and extracts metadata (OpenGraph tags, description, keywords).
+3. **Phase 1 — instant rules** (fast, no AI, no network):
+   - Domain mappings (`github.com` → Development, `youtube.com` → Entertainment, …)
+   - Keyword scoring across title, description, and URL
+   - Your custom domain mappings
+4. A match moves the bookmark into its folder immediately. No match files it under `Engine Organized / Uncategorized` so it never stays loose in your tree.
+5. **Phase 2 — AI** (only if you enable it): unmatched bookmarks go into a batch queue; every 15 are sent to OpenRouter with the fixed taxonomy prompt, then filed.
 
-Recall uses a two-phase approach to classify bookmarks efficiently:
+### Where your bookmarks live
 
-**Phase 1: Instant Rules (no AI, no network)**
-- Domain mappings (GitHub → Development, YouTube → Entertainment, etc.)
-- Keyword scoring (title + description + URL matching against taxonomy)
-- Custom user-defined rules
+Bookmarks are organized under one `Engine Organized` folder on the bookmarks bar:
 
-**Phase 2: AI Fallback (only when rules fail)**
-- If Phase 1 returns "Uncategorized" → sends to OpenRouter AI
-- Only runs during bulk sync, not on every bookmark save
-- Requires OpenRouter API key (free tier available)
-
-### Bookmark Processing Flow
-
-```
-New Bookmark Created
-  └─ Fetch HTML → Extract metadata → Fast rules → Save to IndexedDB
-     (Chrome bookmark NOT moved — user organizes manually)
-
-Bulk Sync (Background)
-  For each bookmark:
-    ├─ Already in "Engine Organized" folder? → Extract category from path
-    ├─ Already in IndexedDB with category? → Keep existing
-    └─ Need classification?
-         ├─ Fetch HTML → Extract metadata
-         ├─ Fast rules → If match → Save
-         └─ If "Uncategorized" + API key → AI classification → Save → Move Chrome bookmark
-```
-
-### The Taxonomy
-
-Categories are structured hierarchically — each category has groups, and each group has leaves. The system picks the full path (e.g. `"Web / Frontend"`), never inventing new labels:
-
-```
-Development
-├── Web          → Frontend, Backend, API, Documentation
-├── Mobile       → iOS, Android
-├── DevOps & Cloud → DevOps, Cloud, Security
-├── Data & AI    → Database, AI, ML, LLM, Robotics
-└── Languages & Tools → Programming Languages, Architecture, Testing, Extensions, Open Source
-
-Learning
-├── Content      → Courses, Tutorials, Videos, Blogs, Books, Lectures
-└── References   → Cheat Sheets, References, Research Papers
-
-Business
-├── Operations   → SaaS, Marketing, Finance, Legal, HR, Accounting, Sales
-└── Strategy     → Startups, Product Management, Analytics
-
-Design
-├── Visual       → UI/UX, Typography, Colors, Icons, Illustrations, Assets
-└── Resources    → Inspiration, Tools, Guidelines
-
-Productivity    → Task Management, Note Taking, Calendars, Collaboration, Communication
-
-Entertainment
-├── Media        → Gaming, Movies, Music, Streaming
-└── Leisure      → Hobbies, Humor, Comics
-
-News & Media    → Tech News, World News, Magazines, Newsletters, Podcasts
-
-Shopping        → Electronics, Clothing, Home, Books, Software, Subscriptions
-
-Personal        → Travel, Health, Recipes, Finances, Fitness, Real Estate, Vehicles
-```
-
-This creates Chrome folders like:
 ```
 Bookmarks Bar
 └── Engine Organized
@@ -116,151 +102,113 @@ Bookmarks Bar
     └── ...
 ```
 
----
+Everything maps to a fixed, hierarchical taxonomy — categories have groups, groups have leaves, and the engine always assigns a full path, never inventing labels:
 
-## Setup
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v18+
-- Google Chrome or Chromium browser
-
-### Install from Source
-
-```bash
-git clone https://github.com/aayushmehta25466/Recall.git
-cd Recall
-npm install
-npm run build
+```
+Development        Web (Frontend, Backend, API, Docs) · Mobile (iOS, Android) ·
+                   DevOps & Cloud (DevOps, Cloud, Security) · Data & AI (DB, AI, ML, LLM, Robotics) ·
+                   Languages & Tools
+Learning           Courses, Tutorials, Videos, Blogs, Books, Cheat Sheets, Papers
+Business           SaaS, Marketing, Finance, Legal, Startups, Product Management
+Design             UI/UX, Typography, Colors, Icons, Inspiration, Tools
+Productivity       Tasks, Notes, Calendars, Collaboration
+Entertainment      Gaming, Movies, Music, Streaming, Hobbies, Humor
+News & Media       Tech News, World News, Magazines, Newsletters, Podcasts
+Shopping           Electronics, Clothing, Home, Books, Software, Subscriptions
+Personal           Travel, Health, Recipes, Finances, Fitness, Vehicles
 ```
 
-The built extension will be in the `dist/chromium/` folder.
+### Search
 
-### Load in Chrome
-
-1. Open `chrome://extensions/`
-2. Enable **Developer mode** (toggle in top-right)
-3. Click **Load unpacked**
-4. Select the `dist/chromium/` folder from this project
-5. Recall appears in your toolbar
-
-### Install from Release
-
-1. Go to [Releases](https://github.com/aayushmehta25466/Recall/releases)
-2. Download the latest `recall-X.X.X.zip`
-3. Unzip the file
-4. Open `chrome://extensions/` → Enable **Developer mode** → **Load unpacked** → select the unzipped folder
+Search runs on a BM25 index (MiniSearch). Save a query and it's remembered — the last 20 show up as a history dropdown next time. Typos still match thanks to 20% fuzzy tolerance, and titles get 2x weight over tags and keywords.
 
 ---
 
-## Connect an LLM (Optional)
+## Optional AI setup
 
-Recall uses [OpenRouter](https://openrouter.ai/) for AI classification as a fallback when fast rules can't categorize a bookmark. **This is optional** — Recall works without an API key using domain mappings and keyword rules.
+Recall is fully usable with zero AI — the rules engine handles most domains locally. An OpenRouter key only matters for the leftovers.
 
-### Setup
-
-1. Go to [openrouter.ai](https://openrouter.ai/) and sign up (free tier available)
-2. Click **Keys** in the sidebar → **Create Key**
-3. Copy the API key
-4. In Recall, click the **Settings** gear icon
-5. Paste your API key in the **OpenRouter API Key** field
-6. Pick a model (default: `Gemini 2.5 Flash Lite` — fast and free)
-
-### Available Models
+1. Create a free key at [openrouter.ai](https://openrouter.ai/) (Keys → Create Key)
+2. Open Recall's **Settings** gear
+3. Paste the key under **OpenRouter API Key**
+4. Pick a model (default: Gemini 2.5 Flash Lite — fast and free)
+5. Turn on **Auto-AI categorize** so unmatched saves join the batch queue, or click **Categorize with AI** on the Home tab for a manual pass
 
 | Model | Speed | Cost |
-|-------|-------|------|
-| Gemini 2.5 Flash Lite (default) | Fast | Free tier |
+|---|---|---|
+| Gemini 2.5 Flash Lite *(default)* | Fast | Free tier |
 | Gemini 2.5 Flash | Fast | Free tier |
 | Gemini 3 Flash | Fast | Free tier |
-| Grok 4.1 Fast | Fast | Paid |
 | DeepSeek V3.1 Terminus | Medium | Free tier |
-| GPT-4o Mini | Medium | Paid |
-| GPT-5 Nano | Medium | Paid |
 | Llama 4 Scout | Medium | Free tier |
+| ChatGPT-4o Mini | Medium | Paid |
+| GPT-5 Nano | Medium | Paid |
+| Grok 4.1 Fast | Fast | Paid |
 | GPT-OSS 120B | Slow | Free tier |
 
-### Organize Your Bookmarks
-
-1. Click the **Settings** gear → go to the **Home** tab
-2. Click **Categorize with AI** — this runs bulk sync on uncategorized bookmarks
-3. Watch the progress bar as bookmarks are classified and moved into Chrome folders
-4. Once done, your bookmarks appear organized under `Engine Organized` in the Chrome sidebar
-
-**Note:** Only bookmarks that don't match fast rules (domain mappings + keywords) are sent to AI. Bookmarks matching known domains are classified instantly without API calls.
+Note: bookmarks matched by domain mappings or keyword rules never touch the network. AI is a last resort, not the main path.
 
 ---
 
-## Development
+## Development & releases
 
 ```bash
-npm run dev          # Extension.js dev server (Chrome)
-npm run build        # Extension.js production build
-npm run build:chrome # Explicit Chrome build
-npm run build:firefox # Firefox build (future)
-npm test             # Run Jest tests
+npm run dev           # Extension.js dev server (hot reload)
+npm test              # Jest test suite
+npm run build         # Production build → dist/chromium
+npm run build:chrome  # → dist/chrome
+npm run build:firefox # → dist/firefox
+npm run build:opera   # → dist/opera
+npm run build:all     # Chrome + Firefox + Opera, zipped
 ```
 
 ### Architecture
 
 ```
 extension/
-├── popup/          # Quick search UI (520×620 popup)
-├── sidepanel/      # Side panel search with history and filters
-├── options/        # Settings, Home tab, bulk actions, trash, rules
-└── background/     # Service worker — sync, AI classification, folder moves
+├── popup/            # Search popup UI (520×620)
+├── sidepanel/        # Side panel / Firefox sidebar UI
+├── options/          # Settings, home dashboard, trash, rules, import/export
+└── background/       # Service worker — bookmark events, sync, AI batches, moves
 
 core/
-├── ai-classifier/  # AI classification via OpenRouter (fallback only)
-├── taxonomy/       # Category tree, domain mappings, keyword rules
-├── search-index/   # BM25 full-text search with MiniSearch
-├── folder-manager/ # Chrome bookmark folder creation + moves
-├── sync-engine/    # Full sync + incremental classification
-├── metadata-extractor/ # HTML metadata extraction (OG tags, meta)
-└── duplicate-detector/
+├── ai-classifier/    # OpenRouter classification + batch queue
+├── taxonomy/         # Category tree, domain mappings, keyword rules
+├── search-index/     # MiniSearch (BM25) full-text index
+├── folder-manager/   # Bookmark folder creation, moves, retry queue
+├── sync-engine/      # Bulk sync + reconciliation against the Chrome tree
+├── metadata-extractor/  # OG/meta tag extraction + content-type inference
+└── duplicate-detector/  # URL normalization + duplicate checks
 
 database/
-└── indexeddb/      # IndexedDB layer via `idb` library
+└── indexeddb/        # IndexedDB storage layer (idb)
 
 shared/
-├── types/          # Data models (Bookmark, Taxonomy)
-└── settings.js     # Default settings + migration
-
-tests/              # Jest tests for core modules
+├── platform.js       # Cross-browser API shim (Chromium / Firefox)
+├── settings.js       # Defaults + sync storage
+└── types/            # Data models
 ```
 
-### Tech Stack
+### Tech stack
 
-- Chrome Extension Manifest V3
-- Extension.js (cross-browser build system)
-- Tailwind CSS v4
-- IndexedDB (via `idb`)
-- MiniSearch (BM25 full-text search)
-- Jest (testing)
-- ESM modules throughout
+Manifest V3 · Extension.js (build) · Tailwind CSS v4 · IndexedDB via `idb` · MiniSearch · Jest · ESM throughout
+
+### Releases
+
+GitHub Actions does the heavy lifting:
+
+- **On every PR** — builds all targets and runs the test suite
+- **On `v*` tag push** — tests, builds Chrome/Firefox/Opera, syncs the tag version into each manifest, zips, and creates the GitHub Release
+
+```bash
+npm version patch     # 2.0.1 → 2.0.2 (bumps package.json + lockfile)
+                      # then manually sync manifest.json to match
+
+git push --follow-tags  # main + tag → release workflow
+```
 
 ---
 
-## Releases
-
-This project uses GitHub Actions to automate releases. The workflow:
-
-1. **On every PR** — builds the extension and runs tests
-2. **On tag push** — builds, zips the extension, and creates a GitHub Release
-
-**To create a release:**
-
-```bash
-# Bump version (updates package.json and creates a git tag)
-npm version patch   # 1.0.0 → 1.0.1
-npm version minor   # 1.0.0 → 1.1.0
-npm version major   # 1.0.0 → 2.0.0
-
-# Push the tag to trigger the release workflow
-git push --follow-tags
-```
-
-This automatically:
-- Syncs the version into `manifest.json`
-- Zips the `dist/` folder as `recall-X.X.X.zip`
-- Creates a GitHub Release with install instructions
+<p align="center">
+  <b>Recall</b> is open source under the <a href="LICENSE">Apache-2.0</a> license.
+</p>
