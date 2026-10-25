@@ -1,4 +1,4 @@
-import { CARD, BADGE, BADGE_DARK } from '../ui.js';
+import { CARD, BADGE, BADGE_DARK, ICON_SOLID_BTN } from '../ui.js';
 import { api, sendMessage, storageGet, storageSet, closeSidebar } from '../platform.js';
 
 /**
@@ -12,7 +12,7 @@ import { api, sendMessage, storageGet, storageSet, closeSidebar } from '../platf
 const HISTORY_KEY = 'searchHistory';
 const MAX_HISTORY = 20;
 
-const ACTION_BAR_CLASS = 'flex items-center gap-2 p-2 flex-wrap bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base mb-2';
+const ACTION_BAR_CLASS = 'flex items-center gap-1.5 p-1.5 flex-wrap bg-surface-card rounded-sm border-2 border-border-default shadow-clay text-text-base mb-2';
 const CHIP_BASE = 'category-filter px-2.5 py-1 text-[11px] font-semibold border rounded-full cursor-pointer whitespace-nowrap transition-all';
 const CHIP_OFF = 'bg-surface-inset text-text-secondary border-border-default hover:bg-accent-green hover:text-white hover:border-accent-green';
 const CHIP_ON = 'bg-accent-green text-white border-accent-green';
@@ -64,7 +64,6 @@ export function mountSearchPanel({ variant = 'popup' } = {}) {
   const actionBar = el('actionBar');
   const searchHistory = el('searchHistory');
   const categoryFilters = el('categoryFilters');
-  const selectAllLink = el('selectAllLink');
 
   let selectedUrls = new Set();
   let currentCategory = 'all';
@@ -189,7 +188,24 @@ export function mountSearchPanel({ variant = 'popup' } = {}) {
     categoryFilters.scrollLeft += e.deltaY;
   }, { passive: false });
 
-  selectAllLink?.addEventListener('click', selectAllResults);
+  // Two masters exist (stats row + action bar); both mirror the rendered cards.
+  // 0 checked = unchecked, some = indeterminate, all = checked.
+  function syncSelectAllChk() {
+    const cards = resultsContainer.querySelectorAll('[data-url]');
+    const checked = resultsContainer.querySelectorAll('.result-check:checked').length;
+    const isAll = cards.length > 0 && checked === cards.length;
+    const isSome = checked > 0 && checked < cards.length;
+    [el('actionAllChk')].forEach((cb) => {
+      if (!cb) return;
+      cb.checked = isAll;
+      cb.indeterminate = isSome;
+    });
+  }
+
+  function onMasterToggle(e) {
+    if (e.target.checked) selectAllResults();
+    else deselectAllResults();
+  }
 
   /* data */
   async function loadStats() {
@@ -255,7 +271,7 @@ export function mountSearchPanel({ variant = 'popup' } = {}) {
 
     resultsContainer.innerHTML = results.map((result) => `
       <article class="${CARD} flex items-start gap-3" data-url="${result.url}">
-        <input type="checkbox" class="result-check mt-1 w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-surface-raised shrink-0 cursor-pointer">
+        <input type="checkbox" class="result-check mt-1 w-5 h-5 rounded-xs border-2 border-border-default accent-accent-green focus:ring-surface-raised shrink-0 cursor-pointer">
         <div class="min-w-0 flex-1 cursor-pointer">
           <div class="flex justify-between items-start gap-2">
             <h3 class="text-sm font-bold text-text-base truncate">${result.title || result.url}</h3>
@@ -317,42 +333,50 @@ export function mountSearchPanel({ variant = 'popup' } = {}) {
   }
 
   function renderActionBar() {
-    const btn = 'flex items-center gap-1 text-xs font-bold border-2 border-border-default rounded-sm bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast min-h-[32px] px-2 py-1 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
-    const btnPrimary = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-border-strong');
-    const btnDanger = btn.replace('bg-surface-card', 'bg-surface-raised').replace('border-border-default', 'border-accent-red');
+    const btnSolidGreen = 'flex items-center gap-1 text-xs font-bold border-2 border-accent-green rounded-sm bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast min-h-[26px] px-1.5 py-0.5 cursor-pointer hover:-translate-y-[1px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
+    const btnSolidRed = btnSolidGreen.replace('border-accent-green', 'border-accent-red').replace('bg-accent-green', 'bg-accent-red').replace('outline-accent-green', 'outline-accent-red');
 
     actionBar.innerHTML = `
       <span class="flex items-center gap-1 text-xs font-bold text-accent-green min-w-[28px]">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
         <span id="selectedCount">0</span>
       </span>
-      <button id="deselectAllResultsBtn" class="${btn}" title="Deselect all">
+      <label class="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-semibold text-text-base" title="Select all results">
+        <input type="checkbox" id="actionAllChk" class="w-4 h-4 rounded-xs border-2 border-border-default accent-accent-green cursor-pointer">
+        <span>Select all</span>
+      </label>
+      <button id="deselectAllResultsBtn" class="${ICON_SOLID_BTN}" title="Deselect all">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
-      <div class="w-px h-4 bg-border-default"></div>
-      <button id="openSelectedBtn" class="${btnPrimary}" title="Open selected in new tabs">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-        <span id="openSelectedLabel">0</span>
-      </button>
-      <button id="trashSelectedBtn" class="${btnDanger}" title="Move selected to trash">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-        <span id="trashSelectedLabel">0</span>
-      </button>
+      <div class="flex items-center gap-2 ml-auto">
+        <button id="openSelectedBtn" class="${btnSolidGreen}" title="Open selected in new tabs">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          <span id="openSelectedLabel">0</span>
+        </button>
+        <button id="trashSelectedBtn" class="${btnSolidRed}" title="Move selected to trash">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <span id="trashSelectedLabel">0</span>
+        </button>
+      </div>
     `;
 
     el('deselectAllResultsBtn').addEventListener('click', deselectAllResults);
     el('openSelectedBtn').addEventListener('click', openSelected);
     el('trashSelectedBtn').addEventListener('click', trashSelected);
+    el('actionAllChk').addEventListener('change', onMasterToggle);
     updateActionBar();
   }
 
   function hideActionBar() {
     actionBar.className = 'hidden';
     actionBar.innerHTML = '';
+    syncSelectAllChk();
   }
 
   function updateActionBar() {
     const count = selectedUrls.size;
+
+    syncSelectAllChk();
 
     if (!actionBar.firstChild) {
       actionBar.className = 'hidden';

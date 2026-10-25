@@ -16,7 +16,10 @@ export const CARD_BODY = 'text-sm text-text-muted';
 export const INPUT = 'w-full bg-surface-inset border-2 border-border-default rounded-sm text-sm text-text-base px-space-4 py-space-2 placeholder-text-secondary shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 min-h-[44px]';
 export const SELECT = INPUT + ' cursor-pointer';
 
-export const CHECKBOX = 'w-5 h-5 rounded-xs bg-surface-card border-2 border-border-default text-accent-green focus:ring-accent-green cursor-pointer';
+export const CHECKBOX = 'w-5 h-5 rounded-xs border-2 border-border-default accent-accent-green focus:ring-accent-green cursor-pointer';
+
+// Filled dark square for icon-only actions: any glyph inside it must be white.
+export const ICON_SOLID_BTN = 'flex items-center justify-center w-6 h-6 border-2 border-border-strong rounded-xs bg-text-base text-text-on-dark shadow-clay-btn select-none transition-all duration-fast ease-in-out cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2';
 
 export const BADGE = 'inline-block text-xs font-bold px-space-3 py-space-1 rounded-xs border-2 border-border-default bg-surface-raised text-accent-green select-none shadow-clay-btn';
 export const BADGE_DARK = 'inline-block text-xs font-bold px-space-3 py-space-1 rounded-xs border-2 border-border-strong bg-text-base text-text-on-dark select-none shadow-clay-btn';
