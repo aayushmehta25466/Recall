@@ -11,14 +11,6 @@ function sendMessage(message) {
   });
 }
 
-// Theme detection (replaces inline script for CSP compliance)
-chrome.storage.sync.get('settings', (data) => {
-  const theme = data.settings?.theme || 'auto';
-  const isDark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', isDark);
-  document.documentElement.classList.toggle('light', !isDark);
-});
-
 // ─── Helpers ───
 function esc(str) {
   const d = document.createElement('div');
@@ -31,50 +23,14 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ─── Tab Switching ───
-const tabs = document.querySelectorAll('[data-tab]');
-const panels = {
-  home: document.getElementById('homePanel'),
-  trash: document.getElementById('trashPanel'),
-  settings: document.getElementById('settingsPanel'),
-  data: document.getElementById('dataPanel'),
-  rules: document.getElementById('rulesPanel'),
-  review: document.getElementById('reviewPanel'),
-};
-let activeTab = 'home';
-
-function switchTab(tab) {
-  activeTab = tab;
-  tabs.forEach(t => {
-    const active = t.dataset.tab === tab;
-    t.classList.toggle('bg-surface-raised', active);
-    t.classList.toggle('border-border-default', active);
-    t.classList.toggle('shadow-clay-sidebar', active);
-  });
-  Object.entries(panels).forEach(([k, p]) => p.classList.toggle('hidden', k !== tab));
+// ─── Tab activation ───
+// Layout/nav/hash routing live in OptionsApp.jsx (React); this module only
+// runs the lazy loaders for panels that need them when React activates a tab.
+export function activateTab(tab) {
   if (tab === 'trash') loadTrash();
   if (tab === 'rules') renderRules();
   if (tab === 'review') loadReview();
 }
-tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
-
-// ─── Sidebar Toggle (mobile) ───
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-  const isOpen = !sidebar.classList.contains('-translate-x-full');
-  if (isOpen) {
-    sidebar.classList.add('-translate-x-full');
-    overlay.classList.add('hidden');
-  } else {
-    sidebar.classList.remove('-translate-x-full');
-    overlay.classList.remove('hidden');
-  }
-}
-
-document.getElementById('sidebarOpenBtn')?.addEventListener('click', toggleSidebar);
-document.getElementById('sidebarCloseBtn')?.addEventListener('click', toggleSidebar);
-document.getElementById('sidebarOverlay')?.addEventListener('click', toggleSidebar);
 
 // ─── Home: Bookmarks ───
 const searchInput = document.getElementById('searchInput');
@@ -1189,9 +1145,8 @@ batchCategorizeBtn.addEventListener('click', async () => {
 });
 
 // ─── Init ───
-const hash = location.hash.replace('#', '');
-const validTabs = ['home', 'trash', 'settings', 'data', 'rules', 'review'];
-switchTab(validTabs.includes(hash) ? hash : 'home');
+// Tab activation is owned by OptionsApp.jsx; module import itself happens
+// post-mount, so every getElementById above already resolves.
 await initSettings();
 await loadBookmarks();
 updateTrashCount();
