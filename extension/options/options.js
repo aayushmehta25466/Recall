@@ -29,7 +29,6 @@ function formatDate(iso) {
 export function activateTab(tab) {
   if (tab === 'trash') loadTrash();
   if (tab === 'rules') renderRules();
-  if (tab === 'review') loadReview();
 }
 
 // ─── Home: Bookmarks ───
@@ -44,11 +43,12 @@ const viewToggleBtn = document.getElementById('viewToggleBtn');
 
 let allBookmarks = [];
 let editMode = false;
+export function isEditMode() { return editMode; }
 let selectedUrls = new Set();
 let dragSrcIndex = null;
 let viewMode = 'folder'; // 'folder' or 'flat'
 
-async function loadBookmarks() {
+export async function loadBookmarks() {
   try {
     console.log('Loading bookmarks from IndexedDB...');
     allBookmarks = await getActiveBookmarks();
@@ -384,7 +384,7 @@ deselectAllBtn.addEventListener('click', () => {
 // Assign category (+ optional subcategory path override) in IndexedDB and move
 // the Chrome bookmark into the matching folder. Shared by Bookmarks bulk Move
 // and Review Assign.
-async function assignCategory(urls, cat, subPath = null) {
+export async function assignCategory(urls, cat, subPath = null) {
   const { getTargetFolderId } = await import('../../core/folder-manager/manager.js');
   for (const url of urls) {
     const b = allBookmarks.find(x => x.url === url);
@@ -523,7 +523,7 @@ restoreAllBtn.addEventListener('click', async () => {
   loadBookmarks();
 });
 
-async function updateTrashCount() {
+export async function updateTrashCount() {
   const items = await getTrashedBookmarks();
   if (items.length > 0) {
     trashCountEl.textContent = items.length;
@@ -923,225 +923,6 @@ addRuleBtn.addEventListener('click', async () => {
   ruleDomain.value = '';
   ruleSubcategory.value = '';
   renderRules();
-});
-
-// ─── Review: Uncategorized Bookmarks ───
-const reviewList = document.getElementById('reviewList');
-const reviewEmpty = document.getElementById('reviewEmpty');
-const reviewStats = document.getElementById('reviewStats');
-const batchCategorizeBtn = document.getElementById('batchCategorizeBtn');
-const batchProgress = document.getElementById('batchProgress');
-const batchStatus = document.getElementById('batchStatus');
-const batchPercent = document.getElementById('batchPercent');
-const batchBar = document.getElementById('batchBar');
-const uncatCountEl = document.getElementById('uncatCount');
-const rBulkBar = document.getElementById('rBulkBar');
-const rSelectedCount = document.getElementById('rSelectedCount');
-const rSelectAllChk = document.getElementById('rSelectAllChk');
-const rDeselectAllBtn = document.getElementById('rDeselectAllBtn');
-const rBulkOpenBtn = document.getElementById('rBulkOpenBtn');
-const rBulkCategory = document.getElementById('rBulkCategory');
-const rBulkSubcategory = document.getElementById('rBulkSubcategory');
-const rBulkAssignBtn = document.getElementById('rBulkAssignBtn');
-const rBulkTagBtn = document.getElementById('rBulkTagBtn');
-const rBulkDeleteBtn = document.getElementById('rBulkDeleteBtn');
-
-let reviewItems = [];
-let reviewSelectedUrls = new Set();
-
-/** The AI batch button is only usable when there is something to categorize. */
-function setBatchButtonState(enabled) {
-  batchCategorizeBtn.disabled = !enabled;
-  batchCategorizeBtn.title = enabled
-    ? 'Classify uncategorized bookmarks with AI'
-    : 'No uncategorized bookmarks';
-}
-
-function updateReviewBulkBar() {
-  const count = reviewSelectedUrls.size;
-  rBulkBar.classList.toggle('hidden', count === 0);
-  rSelectedCount.querySelector('span').textContent = count;
-  if (rSelectAllChk) {
-    const visibleCount = reviewItems.length;
-    rSelectAllChk.checked = visibleCount > 0 && count === visibleCount;
-    rSelectAllChk.indeterminate = count > 0 && count < visibleCount;
-  }
-  rBulkAssignBtn.disabled = !rBulkCategory.value || count === 0;
-}
-
-function renderReviewList() {
-  reviewList.innerHTML = reviewItems.map((b, i) => renderBookmarkCard(b, i, reviewSelectedUrls)).join('');
-  attachBookmarkListeners(reviewList, reviewSelectedUrls, updateReviewBulkBar, () => { loadReview(); updateTrashCount(); });
-  updateReviewBulkBar();
-}
-
-async function loadReview() {
-  try {
-    const { getUncategorizedBookmarks } = await import('../../core/ai-classifier/batchCategorizer.js');
-    reviewItems = await getUncategorizedBookmarks();
-
-    if (reviewItems.length === 0) {
-      reviewList.innerHTML = '';
-      reviewEmpty.classList.remove('hidden');
-      reviewStats.textContent = '';
-      uncatCountEl.classList.add('hidden');
-      setBatchButtonState(false);
-      reviewSelectedUrls.clear();
-      updateReviewBulkBar();
-      return;
-    }
-
-    setBatchButtonState(true);
-    reviewEmpty.classList.add('hidden');
-    reviewStats.textContent = `${reviewItems.length} bookmark${reviewItems.length !== 1 ? 's' : ''} need categorization`;
-    uncatCountEl.textContent = reviewItems.length;
-    uncatCountEl.classList.remove('hidden');
-
-    // Drop selections for bookmarks that no longer exist / are now categorized
-    for (const url of [...reviewSelectedUrls]) {
-      if (!reviewItems.some(b => b.url === url)) reviewSelectedUrls.delete(url);
-    }
-    renderReviewList();
-  } catch (e) {
-    console.error('Failed to load review:', e);
-    reviewList.innerHTML = '<p class="text-sm font-bold text-red-600">Failed to load uncategorized bookmarks.</p>';
-    setBatchButtonState(false);
-  }
-}
-
-// ─── Review bulk actions (manual review) ───
-// Populate category select once
-Object.values(CATEGORIES)
-  .filter(c => c !== CATEGORIES.UNCATEGORIZED)
-  .forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    rBulkCategory.appendChild(opt);
-  });
-
-rBulkCategory.addEventListener('change', async () => {
-  rBulkSubcategory.innerHTML = '<option value="">Subcategory (optional)</option>';
-  if (!rBulkCategory.value) {
-    rBulkSubcategory.disabled = true;
-  } else {
-    const { flattenSubcategoryPaths } = await import('../../core/taxonomy/categories.js');
-    for (const p of flattenSubcategoryPaths(rBulkCategory.value)) {
-      const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = p;
-      rBulkSubcategory.appendChild(opt);
-    }
-    rBulkSubcategory.disabled = false;
-  }
-  updateReviewBulkBar();
-});
-
-if (rSelectAllChk) {
-  rSelectAllChk.addEventListener('change', (e) => {
-    if (e.target.checked) {
-      reviewItems.forEach(b => reviewSelectedUrls.add(b.url));
-    } else {
-      reviewSelectedUrls.clear();
-    }
-    renderReviewList();
-  });
-}
-
-rDeselectAllBtn.addEventListener('click', () => {
-  reviewSelectedUrls.clear();
-  renderReviewList();
-});
-
-rBulkAssignBtn.addEventListener('click', async () => {
-  const cat = rBulkCategory.value;
-  if (!cat || reviewSelectedUrls.size === 0) return;
-  await assignCategory([...reviewSelectedUrls], cat, rBulkSubcategory.value || null);
-  reviewSelectedUrls.clear();
-  rBulkCategory.value = '';
-  rBulkSubcategory.innerHTML = '<option value="">Subcategory (optional)</option>';
-  rBulkSubcategory.disabled = true;
-  await loadReview();
-});
-
-rBulkOpenBtn.addEventListener('click', async () => {
-  if (reviewSelectedUrls.size === 0) return;
-  const urls = [...reviewSelectedUrls];
-  if (urls.length === 1) {
-    await chrome.tabs.create({ url: urls[0], active: true });
-    return;
-  }
-  chrome.runtime.sendMessage({ type: 'OPEN_IN_TAB_GROUP', urls });
-});
-
-rBulkTagBtn.addEventListener('click', async () => {
-  const tags = prompt('Enter tags (comma-separated):');
-  if (!tags) return;
-  const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
-  for (const url of reviewSelectedUrls) {
-    const b = reviewItems.find(x => x.url === url);
-    if (!b) continue;
-    const existing = b.tags || [];
-    await updateBookmark(url, { tags: [...new Set([...existing, ...tagList])] });
-  }
-  reviewSelectedUrls.clear();
-  await loadReview();
-});
-
-rBulkDeleteBtn.addEventListener('click', async () => {
-  for (const url of reviewSelectedUrls) await sendMessage({ type: 'TRASH_BOOKMARK', url });
-  reviewSelectedUrls.clear();
-  await loadReview();
-  updateTrashCount();
-});
-
-batchCategorizeBtn.addEventListener('click', async () => {
-  if (batchCategorizeBtn.disabled) return;
-  try {
-    const { runBatchCategorize } = await import('../../core/ai-classifier/batchCategorizer.js');
-    const settings = await getSettings();
-    if (!settings.openrouterApiKey) {
-      alert('Add an OpenRouter API key in Settings to use AI categorization.');
-      return;
-    }
-
-    batchCategorizeBtn.disabled = true;
-    batchCategorizeBtn.classList.add('opacity-50', 'cursor-not-allowed');
-    batchProgress.classList.remove('hidden');
-    batchBar.style.width = '0%';
-    batchPercent.textContent = '0%';
-    batchStatus.textContent = 'Starting...';
-
-    const { processed, categorized, errors } = await runBatchCategorize(settings, (current, total) => {
-      const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-      batchBar.style.width = pct + '%';
-      batchPercent.textContent = pct + '%';
-      batchStatus.textContent = `Processing ${current} of ${total}...`;
-    });
-
-    if (errors && errors.length > 0) {
-      batchStatus.textContent = `Failed: ${categorized}/${processed} categorized. First error: ${errors[0]}`;
-      console.error('Batch categorize errors:', errors);
-    } else if (processed === 0) {
-      batchStatus.textContent = 'No uncategorized bookmarks found.';
-    } else {
-      batchStatus.textContent = `Done! Categorized ${categorized} of ${processed} bookmarks.`;
-    }
-
-    setTimeout(() => {
-      batchProgress.classList.add('hidden');
-      batchBar.style.width = '0%';
-      batchCategorizeBtn.disabled = false;
-      batchCategorizeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      loadReview();
-      loadBookmarks();
-    }, 2000);
-  } catch (e) {
-    console.error('Batch categorize failed:', e);
-    batchStatus.textContent = `Error: ${e.message}`;
-    batchCategorizeBtn.disabled = false;
-    batchCategorizeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-  }
 });
 
 // ─── Init ───

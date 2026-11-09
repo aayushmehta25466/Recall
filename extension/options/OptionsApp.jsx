@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ReviewPanel from './ReviewPanel.jsx';
 
 // Strangler shell for the options page: React owns layout, sidebar nav, hash
 // routing and the mobile toggle; panel markup below is a class-for-class port
@@ -371,70 +372,8 @@ export default function OptionsApp() {
       </section>
     </div>
 
-    {/* Review Panel (Uncategorized) */}
-    <div id="reviewPanel" className={`${tab === 'review' ? '' : 'hidden '}max-w-5xl mx-auto px-4 sm:px-6 py-5`}>
-      <section className="bg-surface-card border-2 border-border-default rounded-md shadow-clay p-space-5 text-text-base">
-        <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-          <div>
-            <h2 className="text-md font-extrabold tracking-tight text-text-base">Uncategorized Bookmarks</h2>
-            <p className="text-sm text-text-muted mt-1">These bookmarks couldn't be categorized by local rules. Use AI to classify them in bulk.</p>
-          </div>
-          <button id="batchCategorizeBtn" className="font-primary text-sm font-bold tracking-wide border-2 border-accent-blue rounded-sm bg-surface-blue text-accent-blue shadow-clay-btn select-none transition-all duration-fast ease-in-out min-h-[44px] px-space-5 py-space-2 cursor-pointer hover:-translate-y-[2px] hover:shadow-clay-btn-hover active:translate-y-[1px] active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-sm shrink-0">Categorize with AI</button>
-        </div>
-        <div id="batchProgress" className="hidden mb-3">
-          <div className="flex justify-between text-sm mb-1">
-            <span id="batchStatus" className="text-text-base">Processing...</span>
-            <span id="batchPercent" className="text-text-base font-mono">0%</span>
-          </div>
-          <div className="w-full bg-surface-inset rounded-xs h-3 border-2 border-border-default shadow-clay-inset">
-            <div id="batchBar" className="bg-accent-blue h-full rounded-xs transition-all duration-normal" style={{ width: '0%' }}></div>
-          </div>
-        </div>
-        <div id="reviewStats" className="text-sm text-text-secondary mb-3"></div>
-
-        {/* Review Bulk Bar — one row at md+, wraps to 2-3 rows below (row 1 = status + picks + Assign) */}
-        <div id="rBulkBar" className="hidden bg-surface-muted border-2 border-border-default rounded-sm text-text-base shadow-clay mb-3 px-2 py-1.5">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            {/* Row 1 (full width below lg): status + picks + Assign, stretches to fill */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 w-full lg:w-auto lg:flex-1 min-w-0">
-              <span id="rSelectedCount" className="flex items-center gap-1 text-[11px] font-bold text-accent-green shrink-0">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-                <span>0</span>
-              </span>
-              <label className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-semibold text-text-base shrink-0" title="Select all in review">
-                <input type="checkbox" id="rSelectAllChk" className="w-3.5 h-3.5 rounded-xs border-2 border-border-default accent-accent-green cursor-pointer"/>
-                <span>Select all</span>
-              </label>
-              <button id="rDeselectAllBtn" className="flex items-center justify-center w-5 h-5 border-2 border-border-strong rounded-xs bg-text-base text-text-on-dark shadow-clay-btn select-none transition-all duration-fast ease-in-out cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 shrink-0" title="Deselect all">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-              <div className="w-px h-3.5 bg-border-default shrink-0"></div>
-              <select id="rBulkCategory" className="flex-1 min-w-[110px] max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-[11px] text-text-base px-1.5 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-7 cursor-pointer lg:max-w-[190px]">
-                <option value="">Category…</option>
-              </select>
-              <select id="rBulkSubcategory" className="min-w-0 max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-[11px] text-text-base px-1.5 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-7 cursor-pointer w-[150px] lg:w-[130px] truncate" disabled>
-                <option value="">Subcategory</option>
-              </select>
-              <button id="rBulkAssignBtn" className="font-primary text-[11px] font-bold tracking-wide border-2 border-border-strong rounded-xs bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0" disabled>Assign</button>
-            </div>
-            {/* Row 2 below lg, right side of the same row at lg+ */}
-            <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto lg:shrink-0">
-              <button id="rBulkOpenBtn" className="font-primary text-[11px] font-bold tracking-wide border-2 border-accent-green rounded-xs bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2" title="Open selected">Open</button>
-              <button id="rBulkTagBtn" className="font-primary text-[11px] font-bold tracking-wide border-2 border-border-default rounded-xs bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2" title="Tag selected">Tags</button>
-              <button id="rBulkDeleteBtn" className="font-primary text-[11px] font-bold tracking-wide border-2 border-accent-red rounded-xs bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 inline-flex items-center gap-1 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2" title="Trash selected">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
-                Trash
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div id="reviewList" className="flex flex-col gap-3"></div>
-        <div id="reviewEmpty" className="hidden text-center py-12 text-text-secondary text-sm">
-          All bookmarks categorized! Nothing to review.
-        </div>
-      </section>
-    </div>
+    {/* Review Panel (Uncategorized) — markup + logic in ReviewPanel.jsx */}
+    <ReviewPanel active={tab === 'review'} />
   </main>
   </div>
     </>
