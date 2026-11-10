@@ -9,6 +9,7 @@ const { classifyBookmark } = await import('../core/sync-engine/bulk.js');
 
 const settings = (over = {}) => ({
   openrouterApiKey: 'sk-test',
+  customRules: [],
   customDomainMappings: {},
   ...over,
 });
@@ -72,5 +73,59 @@ describe('classifyBookmark AI gate (useAI)', () => {
 
     expect(classifyWithAI).toHaveBeenCalled();
     expect(result.category).toBe('Design');
+  });
+
+  test('a custom rule beats the built-in domain mapping', async () => {
+    const rule = {
+      id: 'r_github',
+      name: 'GitHub → Design',
+      enabled: true,
+      priority: 1,
+      match: 'all',
+      conditions: [{ field: 'domain', op: 'equals', value: 'github.com' }],
+      action: { category: 'Design', subcategory: 'Resources / Tools' },
+    };
+
+    const result = await classifyBookmark(
+      knownMetadata, 'https://github.com/acme/repo', settings({ customRules: [rule] }), { useAI: true }
+    );
+
+    expect(result.category).toBe('Design');
+    expect(result.subcategory).toBe('Resources / Tools');
+    expect(classifyWithAI).not.toHaveBeenCalled();
+  });
+
+  test('legacy domain mappings still classify', async () => {
+    const result = await classifyBookmark(
+      unknownMetadata,
+      'https://unknown.example/x',
+      settings({ customDomainMappings: { 'unknown.example': { category: 'Personal', subcategory: '' } } }),
+      { useAI: true }
+    );
+
+    expect(result.category).toBe('Personal');
+    expect(classifyWithAI).not.toHaveBeenCalled();
+  });
+
+  test('rules can match stored tags', async () => {
+    const rule = {
+      id: 'r_tags',
+      name: 'Tutorial tag',
+      enabled: true,
+      priority: 1,
+      match: 'any',
+      conditions: [{ field: 'tags', op: 'includesAny', value: 'tutorial' }],
+      action: { category: 'Learning', subcategory: 'Content / Tutorials' },
+    };
+
+    const result = await classifyBookmark(
+      { ...unknownMetadata, tags: ['tutorial'] },
+      'https://unknown.example/x',
+      settings({ customRules: [rule] }),
+      { useAI: false }
+    );
+
+    expect(result.category).toBe('Learning');
+    expect(result.subcategory).toBe('Content / Tutorials');
   });
 });

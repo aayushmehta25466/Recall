@@ -111,6 +111,7 @@ export default function SearchPanel({ variant = 'popup' }) {
   const [syncing, setSyncing] = useState(false);
 
   const inputRef = useRef(null);
+  const historyRef = useRef(null);
   const filtersRef = useRef(null);
   const allChkRef = useRef(null);
   const reqIdRef = useRef(0);
@@ -303,7 +304,7 @@ export default function SearchPanel({ variant = 'popup' }) {
   // click outside the input/history hides the history dropdown
   useEffect(() => {
     const onDocClick = (e) => {
-      const wrap = document.getElementById('searchHistory');
+      const wrap = historyRef.current;
       if (inputRef.current && !inputRef.current.contains(e.target) && wrap && !wrap.contains(e.target)) {
         setHistoryOpen(false);
       }
@@ -392,7 +393,7 @@ export default function SearchPanel({ variant = 'popup' }) {
             }
           }}
         />
-        <div id="searchHistory" className={`${historyVisible ? '' : 'hidden '}${HISTORY_SHELL}`}>
+        <div ref={historyRef} id="searchHistory" className={`${historyVisible ? '' : 'hidden '}${HISTORY_SHELL}`}>
           {historyQueries.map((q) => (
             <div key={q} className="flex items-center justify-between px-3 py-2 hover:bg-surface-raised cursor-pointer group"
               onClick={() => useHistoryQuery(q)}>

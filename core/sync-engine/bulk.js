@@ -2,6 +2,7 @@ import { extractMetadata } from '../metadata-extractor/extractor.js';
 import { inferContentType } from '../metadata-extractor/inferrence.js';
 import { getDomainMapping } from '../taxonomy/domainMappings.js';
 import { getScoreForKeywords } from '../taxonomy/keywordRules.js';
+import { findMatchingRule } from '../taxonomy/ruleEngine.js';
 import { classifyWithAI } from '../ai-classifier/classifier.js';
 import { createBookmark } from '../../shared/types/bookmark.js';
 import { saveBookmark, getBookmark } from '../../database/indexeddb/db.js';
@@ -60,12 +61,29 @@ function sendProgress(current, total, url) {
  * Used for instant save during sync and new bookmark creation.
  */
 export function classifyFast(metadata, url, settings) {
-  // 1. Custom domain mappings
-  if (settings.customDomainMappings?.[metadata.domain]) {
-    const custom = settings.customDomainMappings[metadata.domain];
-    const cat = custom.category;
-    const sub = validateSubcategory(cat, custom.subcategory || '');
-    return { category: cat, subcategory: sub };
+  // 1. Custom ruleset (includes legacy domain mappings, added last)
+  const ruleMatch = findMatchingRule(
+    {
+      url,
+      domain: metadata.domain || '',
+      title: metadata.title || '',
+      description: metadata.description || '',
+      siteName: metadata.siteName || '',
+      author: metadata.author || '',
+      language: metadata.language || '',
+      keywords: Array.isArray(metadata.keywords) ? metadata.keywords : [],
+      tags: Array.isArray(metadata.tags) ? metadata.tags : [],
+      contentType: metadata.contentType || '',
+      category: metadata.category || '',
+    },
+    settings
+  );
+  if (ruleMatch) {
+    return {
+      category: ruleMatch.category,
+      subcategory: ruleMatch.subcategory,
+      ...(ruleMatch.tags?.length ? { tags: ruleMatch.tags } : {}),
+    };
   }
 
   // 2. Built-in domain mappings
@@ -203,7 +221,11 @@ async function processBookmark(node, settings, processedUrls) {
   const html = await fetchHtml(node.url);
   const metadata = extractMetadata(html, node.url);
   const contentType = inferContentType(metadata, node.url);
-  const { category, subcategory } = await classifyBookmark(metadata, node.url, settings);
+  const { category, subcategory, tags } = await classifyBookmark(
+    { ...metadata, contentType, tags: existing?.tags || [] },
+    node.url,
+    settings
+  );
 
   const bookmarkObj = createBookmark({
     url: node.url,
@@ -217,6 +239,8 @@ async function processBookmark(node, settings, processedUrls) {
     contentType,
     category,
     subcategory,
+    // Rule-assigned tags are merged with whatever the record already had.
+    tags: tags?.length ? [...new Set([...(existing?.tags || []), ...tags])] : existing?.tags || [],
     chromeFolder,
     dateAdded: new Date(node.dateAdded || Date.now()).toISOString()
   });

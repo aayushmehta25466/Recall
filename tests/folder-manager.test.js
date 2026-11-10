@@ -266,9 +266,14 @@ describe('parseEngineFolderPath', () => {
       .toEqual({ category: 'Learning', subcategory: 'Content / Tutorials' });
   });
 
-  test('falls back to Uncategorized for an unknown category folder', () => {
-    expect(parseEngineFolderPath('Engine Organized / Nope / X'))
-      .toEqual({ category: 'Uncategorized', subcategory: '' });
+  test('preserves a user-defined category folder', () => {
+    expect(parseEngineFolderPath('Engine Organized / My Tools / My Sub'))
+      .toEqual({ category: 'My Tools', subcategory: 'My Sub' });
+  });
+
+  test('preserves a custom subcategory under a built-in category', () => {
+    expect(parseEngineFolderPath('Engine Organized / Development / My Custom'))
+      .toEqual({ category: 'Development', subcategory: 'My Custom' });
   });
 
   test('handles the engine root with no category folder', () => {

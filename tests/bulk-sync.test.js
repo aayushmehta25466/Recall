@@ -112,7 +112,7 @@ describe('Bulk sync processBookmark', () => {
     });
   });
 
-  test('unknown category folder becomes Uncategorized without AI', async () => {
+  test('custom category folder is preserved without AI', async () => {
     const url = 'https://example.com/bogus';
     installChromeMock(treeWith(['Engine Organized', 'NotACategory', 'Nope'], url));
 
@@ -122,8 +122,8 @@ describe('Bulk sync processBookmark', () => {
     expect(classifyWithAI).not.toHaveBeenCalled();
     expect(moveBookmarkToCategory).not.toHaveBeenCalled();
     expect(saveBookmark.mock.calls[0][0]).toMatchObject({
-      category: 'Uncategorized',
-      subcategory: '',
+      category: 'NotACategory',
+      subcategory: 'Nope',
     });
   });
 

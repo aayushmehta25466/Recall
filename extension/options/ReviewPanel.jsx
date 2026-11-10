@@ -4,10 +4,11 @@ import { getSettings } from '../../shared/settings.js';
 import { sendMessage } from '../../shared/platform.js';
 import { CATEGORIES } from '../../shared/types/taxonomy.js';
 import { CARD, BADGE, BADGE_DARK } from '../../shared/ui.js';
+import { useOptions } from './OptionsContext.jsx';
 
 // Faithful React port of the review block that lived in options.js
 // (loadReview / renderReviewList / updateReviewBulkBar / bulk handlers /
-// batch AI). Shared mutations (assignCategory, updateTrashCount,
+// batch AI). Shared mutations (assignCategory,
 // loadBookmarks, edit-mode read) still live in options.js and are pulled
 // in through the cached dynamic import below — options.js must never be
 // statically imported here: its top-level init needs the committed DOM.
@@ -48,6 +49,8 @@ export default function ReviewPanel({ active }) {
   const [batchRunning, setBatchRunning] = useState(false);
   const [batch, setBatch] = useState(null); // { pct, status } while progress is shown
   const selectAllRef = useRef(null);
+  const { setUncatCount, refreshTrashCount, customCategories } = useOptions();
+  const categoryOptions = [...new Set([...CATEGORY_OPTIONS, ...customCategories])];
 
   // loadReview — fires each time the panel activates, the same lazy-loader
   // contract activateTab() had for the review tab.
@@ -74,15 +77,7 @@ export default function ReviewPanel({ active }) {
           new Set([...prev].filter((url) => next.some((b) => b.url === url)))
         );
       }
-      // #uncatCount lives in the sidebar (OptionsApp) — vanilla wrote it
-      // imperatively; React never rewrites this static span's text.
-      const badge = document.getElementById('uncatCount');
-      if (next.length === 0) {
-        badge?.classList.add('hidden');
-      } else if (badge) {
-        badge.textContent = next.length;
-        badge.classList.remove('hidden');
-      }
+      setUncatCount(next.length);
       setEditMode((await vanilla()).isEditMode());
     } catch (e) {
       console.error('Failed to load review:', e);
@@ -109,7 +104,7 @@ export default function ReviewPanel({ active }) {
   // After a card mutation: reload the queue and refresh the sidebar badge.
   const reload = async () => {
     await load();
-    (await vanilla()).updateTrashCount();
+    refreshTrashCount();
   };
 
   const toggleUrl = (url, on) =>
@@ -390,19 +385,19 @@ export default function ReviewPanel({ active }) {
         {/* Review Bulk Bar — one row at md+, wraps to 2-3 rows below (row 1 = status + picks + Assign) */}
         <div
           id="rBulkBar"
-          className={`bg-surface-muted border-2 border-border-default rounded-sm text-text-base shadow-clay mb-3 px-2 py-1.5${
+          className={`bg-surface-muted border-2 border-border-default rounded-sm text-text-base shadow-clay mb-3 px-3 py-2.5${
             selected.size === 0 ? ' hidden' : ''
           }`}
         >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
             {/* Row 1 (full width below lg): status + picks + Assign, stretches to fill */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 w-full lg:w-auto lg:flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 w-full lg:w-auto lg:flex-1 min-w-0">
               <span
                 id="rSelectedCount"
-                className="flex items-center gap-1 text-[11px] font-bold text-accent-green shrink-0"
+                className="flex items-center gap-1 text-xs font-bold text-accent-green shrink-0"
               >
                 <svg
-                  className="w-3.5 h-3.5"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -417,14 +412,14 @@ export default function ReviewPanel({ active }) {
                 <span>{selected.size}</span>
               </span>
               <label
-                className="flex items-center gap-1 cursor-pointer select-none text-[11px] font-semibold text-text-base shrink-0"
+                className="flex items-center gap-1 cursor-pointer select-none text-xs font-semibold text-text-base shrink-0"
                 title="Select all in review"
               >
                 <input
                   type="checkbox"
                   id="rSelectAllChk"
                   ref={selectAllRef}
-                  className="w-3.5 h-3.5 rounded-xs border-2 border-border-default accent-accent-green cursor-pointer"
+                  className="w-4 h-4 rounded-xs border-2 border-border-default accent-accent-green cursor-pointer"
                   onChange={(e) =>
                     setSelected(
                       e.target.checked
@@ -437,12 +432,12 @@ export default function ReviewPanel({ active }) {
               </label>
               <button
                 id="rDeselectAllBtn"
-                className="flex items-center justify-center w-5 h-5 border-2 border-border-strong rounded-xs bg-text-base text-text-on-dark shadow-clay-btn select-none transition-all duration-fast ease-in-out cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 shrink-0"
+                className="flex items-center justify-center w-6 h-6 border-2 border-border-strong rounded-xs bg-text-base text-text-on-dark shadow-clay-btn select-none transition-all duration-fast ease-in-out cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 shrink-0"
                 title="Deselect all"
                 onClick={() => setSelected(new Set())}
               >
                 <svg
-                  className="w-3 h-3"
+                  className="w-3.5 h-3.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -455,15 +450,15 @@ export default function ReviewPanel({ active }) {
                   />
                 </svg>
               </button>
-              <div className="w-px h-3.5 bg-border-default shrink-0"></div>
+              <div className="w-px h-4 bg-border-default shrink-0"></div>
               <select
                 id="rBulkCategory"
                 value={bulkCat}
                 onChange={onCategoryChange}
-                className="flex-1 min-w-[110px] max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-[11px] text-text-base px-1.5 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-7 cursor-pointer lg:max-w-[190px]"
+                className="shrink-0 w-[140px] max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-xs text-text-base px-2 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-8 cursor-pointer"
               >
                 <option value="">Category…</option>
-                {CATEGORY_OPTIONS.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -474,7 +469,7 @@ export default function ReviewPanel({ active }) {
                 value={subValue}
                 disabled={!bulkCat}
                 onChange={(e) => setSubValue(e.target.value)}
-                className="min-w-0 max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-[11px] text-text-base px-1.5 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-7 cursor-pointer w-[150px] lg:w-[130px] truncate"
+                className="shrink-0 w-[145px] max-w-full bg-surface-inset border-2 border-border-default rounded-xs text-xs text-text-base px-2 shadow-clay-inset focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-blue focus-visible:outline-offset-2 h-8 cursor-pointer truncate"
               >
                 {subOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -485,17 +480,17 @@ export default function ReviewPanel({ active }) {
               <button
                 id="rBulkAssignBtn"
                 disabled={!bulkCat || selected.size === 0}
-                className="font-primary text-[11px] font-bold tracking-wide border-2 border-border-strong rounded-xs bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="font-primary text-xs font-bold tracking-wide border-2 border-border-strong rounded-xs bg-surface-raised text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-8 px-3 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                 onClick={onAssign}
               >
                 Assign
               </button>
             </div>
             {/* Row 2 below lg, right side of the same row at lg+ */}
-            <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto lg:shrink-0">
+            <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto lg:shrink-0">
               <button
                 id="rBulkOpenBtn"
-                className="font-primary text-[11px] font-bold tracking-wide border-2 border-accent-green rounded-xs bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2"
+                className="font-primary text-xs font-bold tracking-wide border-2 border-accent-green rounded-xs bg-accent-green text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-8 px-3 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2"
                 title="Open selected"
                 onClick={onBulkOpen}
               >
@@ -503,7 +498,7 @@ export default function ReviewPanel({ active }) {
               </button>
               <button
                 id="rBulkTagBtn"
-                className="font-primary text-[11px] font-bold tracking-wide border-2 border-border-default rounded-xs bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2"
+                className="font-primary text-xs font-bold tracking-wide border-2 border-border-default rounded-xs bg-surface-card text-text-base shadow-clay-btn select-none transition-all duration-fast ease-in-out h-8 px-3 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-green focus-visible:outline-offset-2"
                 title="Tag selected"
                 onClick={onBulkTag}
               >
@@ -511,12 +506,12 @@ export default function ReviewPanel({ active }) {
               </button>
               <button
                 id="rBulkDeleteBtn"
-                className="font-primary text-[11px] font-bold tracking-wide border-2 border-accent-red rounded-xs bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-7 px-2 inline-flex items-center gap-1 cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2"
+                className="font-primary text-xs font-bold tracking-wide border-2 border-accent-red rounded-xs bg-accent-red text-white shadow-clay-btn select-none transition-all duration-fast ease-in-out h-8 w-8 p-0 inline-flex items-center justify-center cursor-pointer hover:-translate-y-px hover:shadow-clay-btn-hover active:translate-y-px active:shadow-clay-pressed focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-accent-red focus-visible:outline-offset-2"
                 title="Trash selected"
                 onClick={onBulkDelete}
               >
                 <svg
-                  className="w-3 h-3"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -528,7 +523,6 @@ export default function ReviewPanel({ active }) {
                     d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
                   />
                 </svg>
-                Trash
               </button>
             </div>
           </div>

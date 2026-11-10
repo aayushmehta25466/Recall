@@ -17,7 +17,11 @@ const DEFAULT_SETTINGS = {
     'Development', 'Learning', 'Business', 'Design', 'Productivity',
     'Entertainment', 'News & Media', 'Shopping', 'Personal', 'Uncategorized'
   ],
-  // Custom rules
+  // Custom rules — ordered rule list (see core/taxonomy/ruleEngine.js)
+  customRules: [],
+  // User-defined category names referenced by custom rules
+  customCategories: [],
+  // Legacy single-purpose domain mappings (still read by the rule engine)
   customDomainMappings: {},
   // AI
   aiTagSuggest: true,

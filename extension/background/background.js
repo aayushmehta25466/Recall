@@ -230,7 +230,7 @@ async function processNewBookmark(id, bookmark) {
   }
 
   try {
-    let category, subcategory, metadata = null, contentType = '';
+    let category, subcategory, metadata = null, contentType = '', tags = existing?.tags || [];
     const storedCategory = existing?.category && existing.category !== 'Uncategorized'
       ? existing.category : null;
 
@@ -255,7 +255,16 @@ async function processNewBookmark(id, bookmark) {
       contentType = inferContentType(metadata, url);
       // Fast rules ONLY. AI for saved bookmarks runs through the batch queue below,
       // which pays the (large, fixed) taxonomy prompt once per 15 URLs.
-      ({ category, subcategory } = await classifyBookmark(metadata, url, settings, { useAI: false }));
+      const classified = await classifyBookmark(
+        { ...metadata, contentType, tags: existing?.tags || [] },
+        url,
+        settings,
+        { useAI: false }
+      );
+      ({ category, subcategory } = classified);
+      if (classified.tags?.length) {
+        tags = [...new Set([...(existing?.tags || []), ...classified.tags])];
+      }
       category = category || 'Uncategorized';
       console.log(
         category === 'Uncategorized'
@@ -284,6 +293,7 @@ async function processNewBookmark(id, bookmark) {
       contentType,
       category,
       subcategory,
+      tags,
       // Keep IndexedDB in step with the native tree (empty when the move failed)
       chromeFolder: targetFolderId ? getFolderPath(category, subcategory) : '',
       dateAdded: new Date(bookmark.dateAdded || Date.now()).toISOString()

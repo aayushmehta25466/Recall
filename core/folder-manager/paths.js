@@ -23,8 +23,8 @@ export function getFolderPath(category, subcategory) {
  * folder path.
  *
  * Returns null when the bookmark is NOT inside the engine tree. Otherwise returns
- * { category, subcategory }; an unrecognized category folder resolves to
- * "Uncategorized" (never sent to AI — the user's arrangement is preserved).
+ * { category, subcategory }. Built-in categories are canonicalised; an unknown
+ * folder under the engine root is treated as a user-defined category.
  *
  * Tolerant by design: the engine root may appear anywhere in the path (a browser
  * bar folder can prefix it, e.g. Firefox "Bookmarks Toolbar / Engine Organized / …"),
@@ -37,12 +37,17 @@ export function parseEngineFolderPath(chromeFolder) {
   const rootIndex = parts.findIndex(p => p.toLowerCase() === ENGINE_ROOT_FOLDER.toLowerCase());
   if (rootIndex === -1) return null;
 
-  const rawCategory = parts[rootIndex + 1] || '';
+  const rawCategory = (parts[rootIndex + 1] || '').trim();
+  if (!rawCategory) return { category: CATEGORIES.UNCATEGORIZED, subcategory: '' };
+
+  // Built-ins are canonicalised; anything else is a user-defined category and
+  // is preserved as-is so custom rules survive a resync.
   const category = Object.values(CATEGORIES)
-    .find(c => c.toLowerCase() === rawCategory.toLowerCase());
+    .find(c => c.toLowerCase() === rawCategory.toLowerCase()) || rawCategory;
 
-  if (!category) return { category: CATEGORIES.UNCATEGORIZED, subcategory: '' };
-
-  const rawSub = parts.slice(rootIndex + 2).join(' / ');
-  return { category, subcategory: validateSubcategory(category, rawSub) };
+  const rawSub = parts.slice(rootIndex + 2).join(' / ').trim();
+  return {
+    category,
+    subcategory: validateSubcategory(category, rawSub) || rawSub,
+  };
 }
