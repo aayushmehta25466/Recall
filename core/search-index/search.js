@@ -5,6 +5,13 @@ import { getActiveBookmarks } from '../../database/indexeddb/db.js';
 let searchIndex = null;
 let indexVersion = 0; // Increment when bookmarks change
 
+// A cold service worker starts buildSearchIndex() while a newly saved bookmark is
+// being indexed. Without this, the build's DB snapshot could overwrite the
+// incremental add and the bookmark stayed unsearchable until the next rebuild.
+let buildInFlight = null;
+const pendingAdds = new Map(); // url -> document, applied when the build lands
+const pendingRemovals = new Set(); // urls, applied when the build lands
+
 // MiniSearch configuration
 const SEARCH_OPTIONS = {
   fields: ['title', 'url', 'description', 'category', 'subcategory', 'tags', 'keywords'],
@@ -44,30 +51,57 @@ function bookmarkToDoc(b) {
  * Build or rebuild the search index from all active bookmarks.
  * Call this once on startup and after bulk operations.
  */
-export async function buildSearchIndex() {
-  const bookmarks = await getActiveBookmarks();
+export function buildSearchIndex() {
+  // Coalesce concurrent rebuilds so only one DB read is in flight.
+  if (buildInFlight) return buildInFlight;
 
-  searchIndex = new MiniSearch(SEARCH_OPTIONS);
+  buildInFlight = (async () => {
+    const bookmarks = await getActiveBookmarks();
+    const documents = bookmarks.map(bookmarkToDoc);
+    const next = new MiniSearch(SEARCH_OPTIONS);
 
-  // Add all bookmarks with full text
-  const documents = bookmarks.map(bookmarkToDoc);
+    // Add all bookmarks with full text
+    next.addAll(documents);
 
-  searchIndex.addAll(documents);
-  indexVersion++;
+    // Re-apply anything indexed or dropped while the snapshot was being read.
+    for (const doc of pendingAdds.values()) {
+      if (next.has(doc.id)) next.discard(doc.id);
+      next.add(doc);
+    }
+    for (const url of pendingRemovals) {
+      if (next.has(url)) next.discard(url);
+    }
+    pendingAdds.clear();
+    pendingRemovals.clear();
 
-  return { count: documents.length, version: indexVersion };
+    searchIndex = next;
+    indexVersion++;
+
+    return { count: next.documentCount, version: indexVersion };
+  })().finally(() => { buildInFlight = null; });
+
+  return buildInFlight;
 }
 
 /**
  * Add or refresh a single bookmark in the in-memory index.
  *
  * Without this, a bookmark saved after the last full build is in IndexedDB but
- * missing from search results until the next rebuild. No-op when the index has
- * not been built yet — the startup build will pick the bookmark up.
+ * missing from search results until the next rebuild. When no index exists yet,
+ * or a build is running, the update is queued and applied as the build lands.
  */
 export function indexBookmark(bookmark) {
-  if (!searchIndex || !bookmark?.url) return;
+  if (!bookmark?.url) return;
   const doc = bookmarkToDoc(bookmark);
+
+  // If a build is running its snapshot may predate this bookmark — queue it so
+  // the build applies it instead of overwriting it.
+  if (!searchIndex || buildInFlight) {
+    pendingAdds.set(doc.id, doc);
+    pendingRemovals.delete(doc.id);
+    return;
+  }
+
   try {
     if (searchIndex.has(doc.id)) searchIndex.discard(doc.id);
     searchIndex.add(doc);
@@ -81,7 +115,12 @@ export function indexBookmark(bookmark) {
  * MiniSearch would otherwise keep a stale document until the next full rebuild.
  */
 export function removeFromIndex(url) {
-  if (!searchIndex || !url) return;
+  if (!url) return;
+  if (!searchIndex || buildInFlight) {
+    pendingRemovals.add(url);
+    pendingAdds.delete(url);
+    return;
+  }
   try {
     if (searchIndex.has(url)) searchIndex.discard(url);
   } catch (e) {
@@ -144,4 +183,6 @@ export async function searchBookmarks(query) {
 export function clearSearchIndex() {
   searchIndex = null;
   indexVersion = 0;
+  pendingAdds.clear();
+  pendingRemovals.clear();
 }

@@ -31,7 +31,7 @@ const BTN_SOLID_RED = BTN_SOLID_GREEN.replace('border-accent-green', 'border-acc
 /* ── icons (identical paths to the vanilla markup) ─────────────────────── */
 
 const HomeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" /></svg>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
 );
 const SettingsIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -117,6 +117,8 @@ export default function SearchPanel({ variant = 'popup' }) {
   const reqIdRef = useRef(0);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const queryRef = useRef(query);
+  queryRef.current = query;
 
   const visible = useMemo(
     () => (currentCategory === 'all'
@@ -276,6 +278,29 @@ export default function SearchPanel({ variant = 'popup' }) {
       if (response?.isSyncing) setSyncing(true);
     });
     if (variant === 'sidebar') inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The background writes bookmarks saved from the browser's own UI. Refresh
+  // the open panel so they show up without resubmitting the search.
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return undefined;
+    let t;
+    const onMessage = (msg) => {
+      if (msg?.type !== 'BOOKMARKS_CHANGED') return;
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const q = queryRef.current.trim();
+        if (q) runSearch(q); else loadAllBookmarks();
+        loadStats();
+      }, 150); // coalesce bursts
+    };
+    chrome.runtime.onMessage.addListener(onMessage);
+    return () => {
+      clearTimeout(t);
+      chrome.runtime.onMessage.removeListener?.(onMessage);
+    };
+    // mount-only: the handlers read refs and stable setters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

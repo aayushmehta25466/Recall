@@ -104,6 +104,25 @@ export default function HomePanel({ active }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sync.complete]);
 
+  // A bookmark saved from the browser's own UI is written by the background
+  // worker; reload so it appears without reopening the options page.
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return undefined;
+    let t;
+    const onMessage = (msg) => {
+      if (msg?.type !== 'BOOKMARKS_CHANGED') return;
+      clearTimeout(t);
+      t = setTimeout(() => load(), 150); // coalesce bursts
+    };
+    chrome.runtime.onMessage.addListener(onMessage);
+    return () => {
+      clearTimeout(t);
+      chrome.runtime.onMessage.removeListener?.(onMessage);
+    };
+    // mount-only: load() only calls the stable setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // getFilteredBookmarks port: search narrows, then sort (over a copy —
   // vanilla sorted the shared array in place).
   const filtered = useMemo(() => {

@@ -19,6 +19,108 @@ console.log('Recall: Background worker initialized.');
 let isSyncing = false;
 
 /**
+ * Bookmarks we just filed, keyed by Chrome id: { url, category, subcategory, expiresAt }.
+ *
+ * The native bookmark bubble creates the node, then moves it to the chosen folder
+ * after we have already filed it. For a short window after creation we treat a
+ * move out of the engine tree as that dialog finishing, and re-file the bookmark.
+ */
+const RECENT_CREATION_TTL_MS = 30000;
+const RECENT_CREATIONS_KEY = 'recentCreations';
+const recentCreations = new Map();
+let recentCreationsLoaded = false;
+let recentCreationsLoading = null;
+
+// session storage survives a service-worker restart but not a browser restart;
+// local is the fallback for engines without storage.session. The callback-based
+// `chrome` namespace is used, matching the rest of the storage layer.
+function recentStorageArea() {
+  return chrome.storage?.session || chrome.storage?.local;
+}
+
+function readStoredCreations() {
+  return new Promise((resolve) => {
+    const area = recentStorageArea();
+    if (!area) return resolve({});
+    try {
+      area.get(RECENT_CREATIONS_KEY, (data) => resolve(data?.[RECENT_CREATIONS_KEY] || {}));
+    } catch {
+      resolve({});
+    }
+  });
+}
+
+function writeStoredCreations() {
+  return new Promise((resolve) => {
+    const area = recentStorageArea();
+    if (!area) return resolve();
+    try {
+      area.set({ [RECENT_CREATIONS_KEY]: Object.fromEntries(recentCreations) }, resolve);
+    } catch {
+      resolve();
+    }
+  });
+}
+
+function pruneExpiredCreations(now = Date.now()) {
+  for (const [key, value] of recentCreations) {
+    if (!value || now > value.expiresAt) recentCreations.delete(key);
+  }
+}
+
+function loadRecentCreations() {
+  if (recentCreationsLoaded) return Promise.resolve();
+  if (recentCreationsLoading) return recentCreationsLoading;
+
+  recentCreationsLoading = (async () => {
+    try {
+      const stored = await readStoredCreations();
+      const now = Date.now();
+      for (const [key, value] of Object.entries(stored)) {
+        if (value && now <= value.expiresAt) recentCreations.set(key, value);
+      }
+    } catch (e) {
+      console.warn('Recall: could not restore recent-creation state:', e);
+    } finally {
+      recentCreationsLoaded = true;
+    }
+  })().finally(() => { recentCreationsLoading = null; });
+
+  return recentCreationsLoading;
+}
+
+async function rememberCreated(id, url, category, subcategory) {
+  // Merge with whatever a previous worker persisted before adding this one.
+  await loadRecentCreations();
+  recentCreations.set(id, {
+    url,
+    category: category || 'Uncategorized',
+    subcategory: subcategory || '',
+    expiresAt: Date.now() + RECENT_CREATION_TTL_MS,
+  });
+  pruneExpiredCreations();
+  await writeStoredCreations();
+}
+
+/** Full " / "-joined title path for a folder id (root excluded). */
+async function folderPathOf(nodeId) {
+  const parts = [];
+  let id = nodeId;
+  for (let i = 0; i < 25 && id; i++) {
+    let node;
+    try {
+      [node] = await api.bookmarks.get(id);
+    } catch {
+      break;
+    }
+    if (!node) break;
+    if (node.parentId) parts.unshift(node.title || '');
+    id = node.parentId;
+  }
+  return parts.join(' / ');
+}
+
+/**
  * Auto-AI on save.
  *
  * Bookmark creation only runs the fast rules; anything that lands in
@@ -82,6 +184,14 @@ chrome.runtime.onInstalled.addListener(handleInstalled);
 api.bookmarks.onCreated.addListener(handleBookmarkCreated);
 api.bookmarks.onRemoved.addListener(handleBookmarkRemoved);
 api.bookmarks.onChanged.addListener(handleBookmarkChanged);
+// Chrome's native "Bookmark this page" dialog creates the bookmark first and
+// only *moves* it when the user picks a folder — which lands after we file it.
+// onMoved lets us reclaim those bookmarks.
+try {
+  api.bookmarks.onMoved?.addListener?.(handleBookmarkMoved);
+} catch (e) {
+  console.warn('Recall: onMoved listener unavailable:', e);
+}
 chrome.runtime.onConnect.addListener(handleConnect);
 chrome.runtime.onMessage.addListener(handleMessage);
 try {
@@ -276,7 +386,10 @@ async function processNewBookmark(id, bookmark) {
     // Always move into the native hierarchy right away, using the fresh Chrome ID
     // handed to us by onCreated (no stale-ID URL search needed).
     const targetFolderId = await moveNewBookmarkWithRetry(url, category, subcategory, id);
-    if (!targetFolderId) {
+    if (targetFolderId) {
+      // Watch for the native dialog moving this node to a user folder right after.
+      await rememberCreated(id, url, category, subcategory);
+    } else {
       // Persist the failure so it gets retried instead of being lost
       await enqueueFailedMove({ url, category, subcategory, reason: 'onCreated move failed' });
     }
@@ -302,6 +415,8 @@ async function processNewBookmark(id, bookmark) {
     await saveBookmark(processedBookmark);
     // Make it searchable immediately (the index is otherwise only rebuilt on sync)
     indexBookmark(processedBookmark);
+    // Let any open popup / side panel / options page refresh its list.
+    broadcast({ type: 'BOOKMARKS_CHANGED', url });
 
     // Hand it to the AI batch workflow when the user opted in. The batch picks up
     // every uncategorized bookmark, so this one is included.
@@ -427,6 +542,56 @@ async function handleBookmarkChanged(id, changeInfo) {
       await updateBookmark(bookmark.url, { title: changeInfo.title });
     }
   } catch { /* bookmark may not be in our DB */ }
+}
+
+/**
+ * Re-file a bookmark we just created when the native bookmark bubble moves it
+ * out of the engine tree.
+ *
+ * The "Bookmark this page" bubble adds the bookmark at the last-used folder and
+ * only moves it once the user picks a folder. That move happens after our
+ * onCreated handler already filed it, which used to leave the bookmark in the
+ * user's folder. We only reclaim bookmarks created in the last
+ * RECENT_CREATION_TTL_MS, so deliberate moves made later are respected.
+ * Moves within the engine tree (including our own) are ignored.
+ */
+async function handleBookmarkMoved(id, moveInfo) {
+  await loadRecentCreations();
+  const recent = recentCreations.get(id);
+  if (!recent || Date.now() > recent.expiresAt) {
+    if (recent) {
+      recentCreations.delete(id);
+      await writeStoredCreations();
+    }
+    return;
+  }
+
+  try {
+    const parentPath = await folderPathOf(moveInfo.parentId);
+    if (parseEngineFolderPath(parentPath)) return; // our own filing, or still organized
+
+    const { url, category, subcategory } = recent;
+    const folderId = await moveBookmarkToCategory(url, category, subcategory, id);
+    recentCreations.delete(id);
+    await writeStoredCreations();
+    if (!folderId) {
+      console.warn(`Recall: could not re-file "${url}" after the native dialog moved it`);
+      return;
+    }
+
+    const path = getFolderPath(category, subcategory);
+    const existing = await getBookmark(url);
+    if (existing) {
+      const updated = await updateBookmark(url, { chromeFolder: path });
+      if (updated) {
+        indexBookmark(updated);
+        broadcast({ type: 'BOOKMARKS_CHANGED', url });
+      }
+    }
+    console.log(`Recall: re-filed bookmark the native dialog moved out → ${path}`);
+  } catch (e) {
+    console.warn('Recall: failed to handle bookmark move:', e);
+  }
 }
 
 async function handleCommand(command) {

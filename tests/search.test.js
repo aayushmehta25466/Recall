@@ -150,6 +150,36 @@ describe('Search Engine', () => {
     expect(hits).toHaveLength(1);
   });
 
+  test('indexBookmark made during a rebuild is not lost to the build snapshot', async () => {
+    const fresh = {
+      url: 'https://fresh.example/zebra',
+      title: 'Zebra Quokka Handbook',
+      description: 'A field guide.',
+      category: 'Learning',
+      subcategory: 'Content / Books',
+      keywords: ['zebra', 'quokka'],
+      tags: ['wildlife'],
+      dateAdded: '2024-06-01T00:00:00Z',
+    };
+
+    let resolveSnapshot;
+    const staleSnapshot = new Promise((resolve) => { resolveSnapshot = resolve; });
+
+    // The rebuild reads a snapshot taken *before* the bookmark was saved…
+    getActiveBookmarks.mockImplementationOnce(() => staleSnapshot);
+    // …while later reads (search) see it.
+    getActiveBookmarks.mockResolvedValue([...mockBookmarks, fresh]);
+
+    clearSearchIndex();
+    const build = buildSearchIndex();
+    indexBookmark(fresh);              // lands mid-build
+    resolveSnapshot(mockBookmarks);    // build finishes with the stale list
+    await build;
+
+    const results = await searchBookmarks('Zebra');
+    expect(results.some(b => b.url === fresh.url)).toBe(true);
+  });
+
   test('removeFromIndex drops a bookmark from search results', async () => {
     const url = 'https://github.com/facebook/react';
     expect((await searchBookmarks('React')).some(b => b.url === url)).toBe(true);
