@@ -30,27 +30,63 @@ Thanks for your interest in contributing! Here's how to get started.
 ## Development
 
 ```bash
-npm run dev       # Vite dev server with hot reload
-npm run build     # Production build to dist/
-npm test          # Run Jest tests
+npm run dev            # Extension.js dev target (hot reload, Chrome)
+npm run dev:firefox    # Extension.js dev target for Firefox
+npm test               # Jest suite (16 suites / 145 tests)
+npm run build          # Production build → dist/chrome
+npm run build:firefox  # → dist/firefox
+npm run build:opera    # → dist/opera
+npm run build:all      # all targets, zipped
 ```
+
+Tests run under Node's ESM loader; the `npm test` script already passes
+`--experimental-vm-modules`.
 
 ### Project Structure
 
 ```
-extension/        → UI (popup, sidepanel, options, background service worker)
-core/             → Business logic (AI classifier, taxonomy, search, sync)
-database/         → IndexedDB layer
-shared/           → Types, settings, UI constants
-tests/            → Jest tests
+extension/
+├── popup/         → Search popup UI
+├── sidepanel/     → Side panel / Firefox sidebar UI
+├── options/       → Home, Review, Trash, Rules, Settings, Data panels (React)
+└── background/    → Service worker: bookmark events, sync, AI batches, moves
+
+core/
+├── ai-classifier/     → OpenRouter classification + batch queue
+├── taxonomy/          → Categories, domain/keyword rules, custom rule engine
+├── sync-engine/       → Bulk sync, reconciliation, apply-rules-to-existing
+├── search-index/      → MiniSearch (BM25) index
+├── folder-manager/    → Native folder creation, moves, retry queue
+├── metadata-extractor/→ OG/meta extraction + content-type inference
+└── duplicate-detector/→ URL normalization + duplicate checks
+
+database/          → IndexedDB layer (idb)
+shared/            → Platform shim, settings, types, React surfaces, UI tokens
+tests/             → Jest tests
 ```
+
+### Where things live
+
+- **Custom rules** — engine in `core/taxonomy/ruleEngine.js`; editor in
+  `extension/options/RulesPanel.jsx`; bulk re-apply in `core/sync-engine/applyRules.js`.
+  Rules are pure data in `settings.customRules`, ordered by `priority`.
+- **Manual review** — `extension/options/ReviewPanel.jsx`; the queue is
+  `getUncategorizedBookmarks()` in `core/ai-classifier/batchCategorizer.js`; assign
+  is `assignCategory()` in `extension/options/options.js`.
+- **Bookmark lifecycle** — event listeners and the save pipeline in
+  `extension/background/background.js`; native moves in `core/folder-manager/manager.js`.
 
 ### Key Conventions
 
 - **ESM everywhere** — all imports use `.js` extensions
 - **No lint/format configured** — write clean code, match existing style
-- **Tests required** — run `npm test` before submitting
+- **Pure logic goes in `core/`** — no DOM or `chrome` globals where it can be avoided,
+  so it stays unit-testable
+- **Tests required** — add coverage for new rules/operators and run `npm test` before
+  submitting
 - **Build must pass** — run `npm run build` to verify
+- **Settings changes** — add the default to `shared/settings.js`; existing users are
+  merged over the defaults automatically
 
 ## Submitting Changes
 

@@ -39,8 +39,11 @@ export async function assignCategory(urls, cat, subPath = null) {
     await updateBookmark(url, {
       category: cat,
       subcategory: sub,
-      'manualOverrides.category': true,
-      'manualOverrides.subcategory': true,
+      manualOverrides: {
+        ...(b?.manualOverrides || {}),
+        category: true,
+        subcategory: true,
+      },
     });
     if (b) {
       try {

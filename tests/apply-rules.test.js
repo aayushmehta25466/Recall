@@ -83,6 +83,49 @@ describe('planRuleApplication', () => {
     expect(planRuleApplication(bookmarks, settings([disabled]))).toEqual([]);
   });
 
+  test('honors priority and supports custom categories/subcategories', () => {
+    const bookmarks = [
+      { url: 'https://a.example/x', domain: 'a.example', category: 'Uncategorized', tags: [] },
+    ];
+    const low = rule({
+      id: 'low',
+      priority: 10,
+      conditions: [{ field: 'domain', op: 'contains', value: 'example' }],
+      action: { category: 'Learning', subcategory: '' },
+    });
+    const high = rule({
+      id: 'high',
+      priority: 1,
+      conditions: [{ field: 'domain', op: 'contains', value: 'a.example' }],
+      action: { category: 'My Tools', subcategory: 'Docs' },
+    });
+
+    const [update] = planRuleApplication(bookmarks, settings([low, high]));
+    expect(update.category).toBe('My Tools');
+    expect(update.subcategory).toBe('Docs');
+  });
+
+  test('ignores records without a URL', () => {
+    expect(planRuleApplication([{ domain: 'react.dev', tags: [] }], settings([rule()]))).toEqual([]);
+  });
+
+  test('matches keywords stored on the record', () => {
+    const keywordRule = rule({
+      conditions: [{ field: 'keywords', op: 'includesAll', value: 'react, hooks' }],
+    });
+    const bookmarks = [
+      { url: 'https://x.example/y', category: 'Uncategorized', keywords: ['react', 'hooks'], tags: [] },
+    ];
+    expect(planRuleApplication(bookmarks, settings([keywordRule]))).toHaveLength(1);
+  });
+
+  test('does not emit a change when nothing matches', () => {
+    const bookmarks = [
+      { url: 'https://other.example/z', domain: 'other.example', category: 'Uncategorized', tags: [] },
+    ];
+    expect(planRuleApplication(bookmarks, settings([rule()]))).toEqual([]);
+  });
+
   test('uses tags and contentType stored on the record', () => {
     const tagRule = rule({
       conditions: [

@@ -63,10 +63,11 @@ function fieldDef(field) {
   return RULE_FIELDS.find((f) => f.field === field) || RULE_FIELDS[0];
 }
 
-// Keep the user-defined category registry in sync with the rules that use it.
-function collectCustomCategories(base, rules) {
+// Derive the user-defined category registry from the rules that use it, so
+// deleting the last rule for a category also drops it from the pickers.
+function collectCustomCategories(rules) {
   const builtIn = new Set(Object.values(CATEGORIES));
-  const out = new Set((Array.isArray(base) ? base : []).filter(Boolean));
+  const out = new Set();
   for (const rule of rules) {
     const category = rule?.action?.category;
     if (typeof category === 'string' && category && !builtIn.has(category)) {
@@ -111,7 +112,7 @@ export default function RulesPanel({ active }) {
     const next = {
       ...base,
       customRules: nextRules,
-      customCategories: collectCustomCategories(base.customCategories, nextRules),
+      customCategories: collectCustomCategories(nextRules),
     };
     await saveSettings(next);
     setSettings(next);
@@ -223,7 +224,7 @@ export default function RulesPanel({ active }) {
     const next = {
       ...base,
       customRules: nextRules,
-      customCategories: collectCustomCategories(base.customCategories, nextRules),
+      customCategories: collectCustomCategories(nextRules),
       customDomainMappings: {},
     };
     await saveSettings(next);

@@ -190,6 +190,113 @@ describe('normalizeRule / normalizeRules', () => {
   });
 });
 
+describe('operators (every supported field)', () => {
+  const ctx = {
+    url: 'https://example.com/path/to/page.html',
+    domain: 'example.com',
+    title: 'Hello World Guide',
+    description: 'A friendly guide',
+    siteName: 'Example',
+    author: 'Jane Doe',
+    language: 'en',
+    keywords: ['alpha', 'beta'],
+    tags: ['one', 'two'],
+    contentType: 'Documentation',
+    category: 'Learning',
+  };
+
+  test('url operators', () => {
+    expect(matchCondition(ctx, { field: 'url', op: 'contains', value: '/path/' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'url', op: 'startsWith', value: 'https://example' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'url', op: 'regex', value: '\\.html$' })).toBe(true);
+  });
+
+  test('domain operators', () => {
+    expect(matchCondition(ctx, { field: 'domain', op: 'endsWith', value: 'example.com' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'domain', op: 'contains', value: 'ample' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'domain', op: 'regex', value: '^example\\.' })).toBe(true);
+  });
+
+  test('text fields: title, description, siteName, author, contentType, category', () => {
+    expect(matchCondition(ctx, { field: 'title', op: 'equals', value: 'hello world guide' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'description', op: 'contains', value: 'friendly' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'siteName', op: 'equals', value: 'Example' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'author', op: 'contains', value: 'jane' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'contentType', op: 'contains', value: 'doc' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'category', op: 'equals', value: 'learning' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'language', op: 'equals', value: 'EN' })).toBe(true);
+  });
+
+  test('includesAll needs every needle and at least one', () => {
+    expect(matchCondition(ctx, { field: 'keywords', op: 'includesAll', value: 'alpha, beta' })).toBe(true);
+    expect(matchCondition(ctx, { field: 'keywords', op: 'includesAll', value: 'alpha, gamma' })).toBe(false);
+    expect(matchCondition(ctx, { field: 'keywords', op: 'includesAll', value: '' })).toBe(false);
+  });
+
+  test('operators a field does not support never match', () => {
+    expect(matchCondition(ctx, { field: 'language', op: 'contains', value: 'e' })).toBe(false);
+    expect(matchCondition(ctx, { field: 'keywords', op: 'equals', value: 'alpha' })).toBe(false);
+  });
+});
+
+describe('priority and ordering', () => {
+  test('equal priorities keep insertion order (stable)', () => {
+    const a = makeRule({ id: 'a', priority: 5, action: { category: 'Learning', subcategory: '' } });
+    const b = makeRule({ id: 'b', priority: 5, action: { category: 'Design', subcategory: '' } });
+    expect(findMatchingRule(context, settings([a, b])).rule.id).toBe('a');
+  });
+
+  test('normalizeRules sorts ascending', () => {
+    const rules = normalizeRules({
+      customRules: [
+        makeRule({ id: 'z', priority: 9 }),
+        makeRule({ id: 'a', priority: 1 }),
+      ],
+    });
+    expect(rules.map((r) => r.id)).toEqual(['a', 'z']);
+  });
+});
+
+describe('normalizeRule edge cases', () => {
+  test('defaults priority, enabled, match mode and name', () => {
+    const rule = normalizeRule({
+      conditions: [{ field: 'title', op: 'contains', value: 'x' }],
+      action: { category: 'Development' },
+    });
+    expect(rule.priority).toBe(100);
+    expect(rule.enabled).toBe(true);
+    expect(rule.match).toBe('all');
+    expect(rule.name).toBe('Untitled rule');
+    expect(rule.action.tags).toEqual([]);
+  });
+
+  test('splits comma tags and caps at five', () => {
+    const rule = normalizeRule(
+      makeRule({ action: { category: 'Development', subcategory: '', tags: 'a, b, c, d, e, f' } })
+    );
+    expect(rule.action.tags).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  test('drops unknown fields and unsupported operators', () => {
+    expect(normalizeRule(makeRule({ conditions: [{ field: 'bogus', op: 'contains', value: 'x' }] }))).toBeNull();
+    expect(normalizeRule(makeRule({ conditions: [{ field: 'title', op: 'bogus', value: 'x' }] }))).toBeNull();
+  });
+
+  test('preserves an explicitly disabled rule', () => {
+    expect(normalizeRule(makeRule({ enabled: false })).enabled).toBe(false);
+  });
+
+  test('custom category flows through matching with its tags', () => {
+    const rule = makeRule({
+      action: { category: 'Reading', subcategory: 'Later', tags: ['read', 'later'] },
+    });
+    const match = findMatchingRule(context, settings([rule]));
+    expect(match.category).toBe('Reading');
+    expect(match.subcategory).toBe('Later');
+    expect(match.tags).toEqual(['read', 'later']);
+  });
+});
+
 describe('describeRule', () => {
   test('renders conditions with the match mode', () => {
     const rule = normalizeRule(
